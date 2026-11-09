@@ -1,0 +1,93 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, typecheck, build
+    # GitHub-hosted: PRs (including forks) must never run on the VPS runner.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run typecheck
+
+  deploy:
+    name: Deploy to VPS
+    needs: ci
+    # Only trusted refs reach the self-hosted runner.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, neural-frontier]
+    environment:
+      name: production
+      url: http://27.147.147.228:8280
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      APP_ROOT: /opt/neural-frontier
+      SERVICE: neural-frontier-web.service
+      HEALTH_URL: http://127.0.0.1:3200/api/health
+      KEEP_RELEASES: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and build
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          NEXT_TELEMETRY_DISABLED: 1
+        run: |
+          npm ci
+          npm run build
+          npm prune --omit=dev
+
+      - name: Stage release
+        id: release
+        run: |
+          RELEASE="$APP_ROOT/releases/$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}"
+          mkdir -p "$RELEASE"
+          cp -a .next node_modules package.json package-lock.json next.config.mjs "$RELEASE"/
+          [ -d public ] && cp -a public "$RELEASE"/ || true
+          echo "path=$RELEASE" >> "$GITHUB_OUTPUT"
+          echo "previous=$(readlink -f "$APP_ROOT/current" 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Activate and restart
+        run: |
+          ln -sfn "${{ steps.release.outputs.path }}" "$APP_ROOT/current"
+          sudo /usr/bin/systemctl restart "$SERVICE"
+
+      - name: Health check (auto-rollback on failure)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "$HEALTH_URL" | grep -q "$GITHUB_SHA"; then
+              echo "Healthy: $(curl -fsS "$HEALTH_URL")"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Health check failed for ${GITHUB_SHA}"
+          PREV="${{ steps.release.outputs.previous }}"
+          if [ -n "$PREV" ] && [ -d "$PREV" ]; then
+            echo "Rolling back to $PREV"
+            ln -sfn "$PREV" "$APP_ROOT/current"
+            sudo /usr/bin/systemctl restart "$SERVICE"
+          fi
+          exit 1
+
+      - name: Prune old releases
+        if: success()
+        run: |
+          cd "$APP_ROOT/releases"
+          ls -1dt */ | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf

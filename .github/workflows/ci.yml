@@ -1,0 +1,180 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "phase-*", "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+# Every job runs on GitHub-hosted runners. The repository is public: untrusted pull-request
+# code must never reach the self-hosted production runner (that is deploy.yml, main only).
+jobs:
+  quality:
+    name: Format, lint, types, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Formatting
+        run: npm run format:check
+      - name: Build shared packages
+        run: npm run build:packages
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Build applications
+        run: npm run build -w @nf/api -w @nf/web
+      - name: OpenAPI contract unchanged
+        run: |
+          npm run openapi
+          git diff --exit-code docs/api/openapi.json || {
+            echo "::error::docs/api/openapi.json is out of date. Run 'npm run openapi' and commit it."; exit 1; }
+      - name: Shell scripts (shellcheck)
+        run: shellcheck -x deploy/oracle-linux/scripts/*.sh
+
+  integration:
+    name: Integration tests (MySQL 8.4 + Redis 7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: nf_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot" --health-interval=5s --health-timeout=5s --health-retries=30
+      redis:
+        image: redis:7.2
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      TEST_DATABASE_URL: mysql://root:root@127.0.0.1:3306/nf_test?allowPublicKeyRetrieval=true
+      TEST_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Integration and contract tests (applies migrations first)
+        run: npm run test:integration
+      - name: Migrations match the schema (no un-migrated schema changes)
+        working-directory: packages/db
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code \
+            || { echo "::error::schema.prisma has changes without a migration"; exit 1; }
+
+  e2e:
+    name: End-to-end (Playwright, real OIDC sign-in)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: nf_e2e
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot" --health-interval=5s --health-timeout=5s --health-retries=30
+      redis:
+        image: redis:7.2
+        ports: ["6379:6379"]
+    env:
+      E2E_DATABASE_URL: mysql://root:root@127.0.0.1:3306/nf_e2e?allowPublicKeyRetrieval=true
+      E2E_REDIS_URL: redis://127.0.0.1:6379/1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npm run test:e2e
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-screenshots
+          path: apps/web/test-results/screenshots
+          if-no-files-found: ignore
+          retention-days: 30
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 14
+
+  supply-chain:
+    name: Dependencies, licenses, secrets, SBOM
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Known vulnerabilities in production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Lockfile integrity and registry signatures
+        run: npm audit signatures
+      - name: License compliance
+        run: npm run license:check
+      - name: Secret scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Software bill of materials (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          artifact-name: sbom.cyclonedx.json
+
+  # Single required status check for branch protection and for deploy.yml.
+  ci-passed:
+    name: CI passed
+    if: always()
+    needs: [quality, integration, e2e, supply-chain]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [[ "${{ needs.quality.result }}" == success && "${{ needs.integration.result }}" == success && \
+             "${{ needs.e2e.result }}" == success && "${{ needs.supply-chain.result }}" == success ]] \
+            || { echo "::error::A required CI job failed"; exit 1; }

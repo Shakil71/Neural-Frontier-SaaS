@@ -1,0 +1,239 @@
+@import "tailwindcss";
+
+/*
+ * Neural Frontier design tokens.
+ * Semantic tokens only — components never use raw palette values.
+ * Dark ("Deep Space") is the default; light ("Daybreak") is a first-class theme.
+ * Colours are OKLCH so lightness steps are perceptually even across hues.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-solid: var(--primary-solid);
+  --color-primary-solid-hover: var(--primary-solid-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-ring: var(--ring);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-card:
+    0 1px 0 0 var(--highlight) inset, 0 1px 2px 0 oklch(0 0 0 / 0.06),
+    0 8px 24px -12px oklch(0 0 0 / 0.18);
+  --shadow-pop: 0 1px 0 0 var(--highlight) inset, 0 16px 48px -16px oklch(0 0 0 / 0.45);
+  --shadow-glow: 0 0 0 1px var(--primary-soft), 0 8px 32px -8px var(--primary-glow);
+
+  --animate-fade-in: fade-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-aurora: aurora 18s ease-in-out infinite alternate;
+  --animate-pulse-node: pulse-node 3.2s ease-in-out infinite;
+  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes aurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(4%, -3%, 0) scale(1.08);
+    }
+    100% {
+      transform: translate3d(-3%, 2%, 0) scale(0.96);
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateX(24px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
+    }
+  }
+  @keyframes pulse-node {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
+:root {
+  /* Daybreak (light) */
+  --background: oklch(0.985 0.004 265);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: oklch(0.965 0.007 265);
+  --border: oklch(0.915 0.012 265);
+  --border-strong: oklch(0.85 0.018 265);
+  --foreground: oklch(0.21 0.035 265);
+  --muted: oklch(0.47 0.03 265);
+  --subtle: oklch(0.55 0.025 265);
+  --primary: oklch(0.53 0.22 277);
+  --primary-hover: oklch(0.48 0.22 277);
+  /* Filled buttons: white text ≥ 4.5:1 (measured 5.6:1). */
+  --primary-solid: oklch(0.53 0.22 277);
+  --primary-solid-hover: oklch(0.48 0.22 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-soft: oklch(0.53 0.22 277 / 0.1);
+  --primary-glow: oklch(0.53 0.22 277 / 0.25);
+  --accent: oklch(0.6 0.12 215);
+  --accent-soft: oklch(0.6 0.12 215 / 0.12);
+  --success: oklch(0.52 0.14 155);
+  --success-soft: oklch(0.52 0.14 155 / 0.12);
+  --warning: oklch(0.55 0.13 65);
+  --warning-soft: oklch(0.66 0.15 70 / 0.16);
+  --danger: oklch(0.57 0.21 25);
+  --danger-soft: oklch(0.57 0.21 25 / 0.1);
+  --ring: oklch(0.53 0.22 277 / 0.45);
+  --highlight: oklch(1 0 0 / 0.6);
+  --grid-line: oklch(0.21 0.035 265 / 0.045);
+  --aurora-a: oklch(0.7 0.16 277 / 0.18);
+  --aurora-b: oklch(0.8 0.12 210 / 0.16);
+  --chart-1: oklch(0.53 0.22 277);
+  --chart-2: oklch(0.62 0.12 215);
+  --chart-3: oklch(0.62 0.15 320);
+  --chart-4: oklch(0.66 0.14 160);
+  --chart-5: oklch(0.7 0.14 70);
+  color-scheme: light;
+}
+
+.dark {
+  /* Deep Space (dark) */
+  --background: oklch(0.145 0.028 268);
+  --surface: oklch(0.175 0.032 268);
+  --surface-raised: oklch(0.205 0.036 268);
+  --surface-sunken: oklch(0.13 0.026 268);
+  --border: oklch(0.32 0.04 268 / 0.55);
+  --border-strong: oklch(0.42 0.045 268 / 0.7);
+  --foreground: oklch(0.955 0.01 268);
+  --muted: oklch(0.74 0.025 268);
+  --subtle: oklch(0.62 0.03 268);
+  --primary: oklch(0.65 0.19 277);
+  --primary-hover: oklch(0.7 0.18 277);
+  /* Darker than --primary so white button text reaches 5.0:1. */
+  --primary-solid: oklch(0.55 0.2 277);
+  --primary-solid-hover: oklch(0.5 0.21 277);
+  --primary-foreground: oklch(0.99 0 0);
+  --primary-soft: oklch(0.65 0.19 277 / 0.16);
+  --primary-glow: oklch(0.65 0.19 277 / 0.35);
+  --accent: oklch(0.82 0.12 205);
+  --accent-soft: oklch(0.82 0.12 205 / 0.13);
+  --success: oklch(0.76 0.15 158);
+  --success-soft: oklch(0.76 0.15 158 / 0.13);
+  --warning: oklch(0.82 0.14 78);
+  --warning-soft: oklch(0.82 0.14 78 / 0.13);
+  --danger: oklch(0.7 0.19 22);
+  --danger-soft: oklch(0.7 0.19 22 / 0.14);
+  --ring: oklch(0.7 0.18 277 / 0.55);
+  --highlight: oklch(1 0 0 / 0.045);
+  --grid-line: oklch(0.9 0.02 268 / 0.035);
+  --aurora-a: oklch(0.55 0.2 280 / 0.28);
+  --aurora-b: oklch(0.7 0.14 205 / 0.18);
+  --chart-1: oklch(0.68 0.19 277);
+  --chart-2: oklch(0.82 0.12 205);
+  --chart-3: oklch(0.72 0.17 320);
+  --chart-4: oklch(0.76 0.15 158);
+  --chart-5: oklch(0.82 0.14 78);
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: var(--primary-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Faint engineering grid used behind hero areas. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .text-gradient {
+    background: linear-gradient(
+      110deg,
+      var(--foreground) 20%,
+      var(--primary) 60%,
+      var(--accent) 95%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

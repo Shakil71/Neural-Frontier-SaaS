@@ -1,0 +1,13 @@
+[Unit]
+Description=Neural Frontier encrypted database backup
+After=mysqld.service
+
+[Service]
+Type=oneshot
+User=root
+# Root-owned copy installed by install.sh — never a path the service user can modify.
+ExecStart=/usr/local/lib/neural-frontier/backup.sh
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=yes
+NoNewPrivileges=yes

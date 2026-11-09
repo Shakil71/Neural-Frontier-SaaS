@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+coverage
+package-lock.json
+packages/db/src/generated
+packages/db/prisma/migrations
+playwright-report
+test-results
+docs/api/openapi.json

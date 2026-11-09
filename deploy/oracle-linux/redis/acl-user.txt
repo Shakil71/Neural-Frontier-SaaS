@@ -1,0 +1,5 @@
+# Neural Frontier Redis ACL user. install.sh applies this with ACL SETUSER and ACL SAVE
+# (requires an `aclfile` in redis.conf) or, if no aclfile is configured, prints the line to add
+# to redis.conf. The user can only touch keys under nf:* and cannot run admin commands.
+#
+#   user nf on >__NF_REDIS_PASSWORD__ ~nf:* resetchannels -@all +@read +@write +@string +@hash +@list +@set +@sortedset +@keyspace +@scripting +@connection -@dangerous

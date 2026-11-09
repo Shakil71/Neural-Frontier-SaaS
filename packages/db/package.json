@@ -1,0 +1,33 @@
+{
+  "name": "@nf/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "prisma": "7.10.1",
+    "vitest": "5.1.0"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.1",
+    "@prisma/adapter-mariadb": "7.10.1",
+    "@nf/contracts": "0.1.0"
+  },
+  "description": "Operational database: Prisma schema, migrations, tenant guard, bootstrap.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "node dist/seed.js"
+  }
+}

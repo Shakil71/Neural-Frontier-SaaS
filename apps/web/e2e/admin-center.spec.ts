@@ -71,6 +71,8 @@ test("owner signs in, grants a role, and the change is audited", async ({ page }
   // Sign out ends the session.
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();
+  // Single sign-out: the dev IdP asks to confirm before ending its session.
+  await page.getByRole("button", { name: "Yes, sign me out" }).click();
   await expect(page.getByText("You've been signed out.")).toBeVisible();
   await page.goto("/audit");
   await expect(page).toHaveURL(/\/sign-in/);

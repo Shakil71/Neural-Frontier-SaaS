@@ -100,7 +100,9 @@ describe("configuring a tenant's own provider", () => {
       .send({ issuer: "http://127.0.0.1:1/nope", clientId: "x", clientSecret: "y" })
       .expect(400);
     expect(res.body.error.message).toMatch(/openid-configuration/);
-    expect((await owner.get("/api/v1/tenant/identity-provider").expect(200)).body).toBeNull();
+    expect((await owner.get("/api/v1/tenant/identity-provider").expect(200)).body).toEqual({
+      identityProvider: null,
+    });
   });
 
   it("stores the secret sealed and never returns it; the change is audited", async () => {
@@ -211,7 +213,7 @@ describe("requiring the tenant's provider", () => {
   it("is refused until the owner has signed in through it, then blocks the shared provider", async () => {
     const owner = await signIn(t, acme.tenantId, acme.owner);
     let idp = TenantIdentityProviderSchema.parse(
-      (await owner.get("/api/v1/tenant/identity-provider")).body,
+      (await owner.get("/api/v1/tenant/identity-provider")).body.identityProvider,
     );
     const refused = await owner
       .patch("/api/v1/tenant/identity-provider/enforcement")
@@ -251,7 +253,7 @@ describe("requiring the tenant's provider", () => {
     try {
       const owner = await signIn(t, acme.tenantId, acme.owner);
       const current = TenantIdentityProviderSchema.parse(
-        (await owner.get("/api/v1/tenant/identity-provider")).body,
+        (await owner.get("/api/v1/tenant/identity-provider")).body.identityProvider,
       );
       await owner
         .put("/api/v1/tenant/identity-provider")

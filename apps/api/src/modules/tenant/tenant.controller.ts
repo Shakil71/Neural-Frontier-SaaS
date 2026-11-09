@@ -48,11 +48,14 @@ export class TenantController {
     };
   }
 
-  /** The tenant's own OIDC provider, or null when it uses the deployment-wide one. */
+  /**
+   * The tenant's own OIDC provider, or `identityProvider: null` when it uses the deployment-wide
+   * one. Wrapped in an object: a bare `null` would be sent as an empty body.
+   */
   @Get("identity-provider")
   @RequirePermission("tenant.read")
-  getIdp(@CurrentPrincipal() p: Principal) {
-    return this.idp.get(p.tenantId);
+  async getIdp(@CurrentPrincipal() p: Principal) {
+    return { identityProvider: await this.idp.get(p.tenantId) };
   }
 
   @Put("identity-provider")

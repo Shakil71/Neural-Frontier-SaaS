@@ -46,3 +46,7 @@ export const SetIdpEnforcementSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 export type SetIdpEnforcement = z.infer<typeof SetIdpEnforcementSchema>;
+
+export const TenantIdentityProviderResponseSchema = z.object({
+  identityProvider: TenantIdentityProviderSchema.nullable(),
+});

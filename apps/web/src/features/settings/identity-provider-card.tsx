@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   IssuerUrlSchema,
   type TenantIdentityProvider,
+  TenantIdentityProviderResponseSchema,
   TenantIdentityProviderSchema,
 } from "@nf/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -270,8 +271,8 @@ export function IdentityProviderCard({ sharedConfigured }: { sharedConfigured: b
     queryKey: key,
     queryFn: () =>
       api("/api/v1/tenant/identity-provider", {
-        schema: TenantIdentityProviderSchema.nullable(),
-      }),
+        schema: TenantIdentityProviderResponseSchema,
+      }).then((r) => r.identityProvider),
   });
   const p = idp.data ?? null;
   const required = p?.enforcement === "required";

@@ -1,0 +1,41 @@
+[Unit]
+Description=Neural Frontier Admin Center (Next.js)
+Documentation=https://github.com/Shakil71/Neural-Frontier-SaaS/blob/main/docs/operations/deployment.md
+After=network-online.target neural-frontier-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=neural
+Group=neural
+WorkingDirectory=/license_monitoring/neural-frontier/current/apps/web
+EnvironmentFile=/etc/neural-frontier/web.env
+ExecStart=/usr/bin/node /license_monitoring/neural-frontier/current/node_modules/next/dist/bin/next start --port 3400 --hostname 127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+# Next.js writes its runtime cache inside the release.
+ReadWritePaths=/license_monitoring/neural-frontier/releases
+LimitNOFILE=65536
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,17 @@
+# Secret scanning configuration (gitleaks). Extends the default rules.
+# The paths below contain only deliberately fake, labelled development/test values
+# (e.g. "dev-secret-not-for-production"). Real secrets live only in /etc/neural-frontier on the host.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Development and test fixtures with non-secret placeholder values"
+paths = [
+  '''^tools/dev-idp/server\.js$''',
+  '''^apps/web/playwright\.config\.ts$''',
+  '''^apps/api/test/.*''',
+  '''^apps/api/src/.*\.test\.ts$''',
+  '''^apps/api/src/openapi\.ts$''',
+  '''^deploy/oracle-linux/env/.*\.example$''',
+  '''^docs/development\.md$''',
+]

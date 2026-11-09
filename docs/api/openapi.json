@@ -1,0 +1,297 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/login": {
+      "get": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/callback": {
+      "get": {
+        "operationId": "AuthController_callback",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "AuthController_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/identities": {
+      "get": {
+        "operationId": "IdentitiesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}": {
+      "get": {
+        "operationId": "IdentitiesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/status": {
+      "patch": {
+        "operationId": "IdentitiesController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "RolesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/role-assignments": {
+      "get": {
+        "operationId": "RolesController_assignments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/role-assignments": {
+      "post": {
+        "operationId": "RolesController_assign",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/role-assignments/{id}": {
+      "delete": {
+        "operationId": "RolesController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "roles"
+        ]
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "audit"
+        ]
+      }
+    },
+    "/api/v1/tenant": {
+      "get": {
+        "operationId": "TenantController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "operationId": "DashboardController_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/system/health": {
+      "get": {
+        "operationId": "HealthController_detail",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Neural Frontier API",
+    "description": "Control-plane API. Authentication is a session cookie set by SSO sign-in. State-changing requests require the `x-csrf-token` header from GET /api/v1/auth/session.",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-nf_session"
+      }
+    },
+    "schemas": {}
+  }
+}

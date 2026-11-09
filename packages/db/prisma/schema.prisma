@@ -1,0 +1,208 @@
+// Neural Frontier — operational database (MySQL 8.4 LTS).
+//
+// Conventions (see docs/architecture/data-model.md):
+// - Primary keys are UUIDv7 (time-ordered, index-friendly, partition-friendly).
+// - Every tenant-owned table carries `tenantId`, and every secondary index leads with it.
+//   The tenant guard in src/tenant-guard.ts refuses queries that omit it.
+// - Mutable aggregates carry `version` for optimistic concurrency.
+// - No credentials are stored here. Session tokens are stored only as SHA-256 hashes.
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+  generatedFileExtension = "ts"
+}
+
+datasource db {
+  provider     = "mysql"
+  relationMode = "foreignKeys"
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum IdentityStatus {
+  active
+  suspended
+}
+
+enum AuditOutcome {
+  success
+  failure
+  denied
+}
+
+model Tenant {
+  id        String       @id @default(uuid(7)) @db.Char(36)
+  slug      String       @unique @db.VarChar(63)
+  name      String       @db.VarChar(200)
+  status    TenantStatus @default(active)
+  createdAt DateTime     @default(now()) @db.DateTime(3)
+  updatedAt DateTime     @updatedAt @db.DateTime(3)
+  version   Int          @default(0)
+
+  domains         TenantDomain[]
+  identities      Identity[]
+  roles           Role[]
+  roleAssignments RoleAssignment[]
+  sessions        Session[]
+  auditEvents     AuditEvent[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@map("tenants")
+}
+
+/// Email domains whose verified users sign in to this tenant.
+model TenantDomain {
+  id         String    @id @default(uuid(7)) @db.Char(36)
+  tenantId   String    @db.Char(36)
+  domain     String    @unique @db.VarChar(253)
+  verifiedAt DateTime? @db.DateTime(3)
+  createdAt  DateTime  @default(now()) @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+model Identity {
+  id           String         @id @default(uuid(7)) @db.Char(36)
+  tenantId     String         @db.Char(36)
+  email        String         @db.VarChar(320)
+  displayName  String         @db.VarChar(200)
+  status       IdentityStatus @default(active)
+  /// OIDC issuer + subject are bound on first sign-in; later sign-ins match on them, not on email.
+  oidcIssuer   String?        @db.VarChar(512)
+  oidcSubject  String?        @db.VarChar(255)
+  lastSignInAt DateTime?      @db.DateTime(3)
+  createdAt    DateTime       @default(now()) @db.DateTime(3)
+  updatedAt    DateTime       @updatedAt @db.DateTime(3)
+  version      Int            @default(0)
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  roleAssignments RoleAssignment[] @relation("assignee")
+  grantsMade      RoleAssignment[] @relation("grantor")
+  sessions        Session[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, email])
+  @@unique([oidcIssuer, oidcSubject])
+  @@index([tenantId, status])
+  @@index([tenantId, displayName])
+  @@map("identities")
+}
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Char(36)
+  tenantId    String   @db.Char(36)
+  key         String   @db.VarChar(64)
+  name        String   @db.VarChar(120)
+  description String   @db.VarChar(500)
+  builtIn     Boolean  @default(false)
+  /// Array of permission keys from @nf/contracts PERMISSIONS. Validated on read.
+  permissions Json
+  createdAt   DateTime @default(now()) @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @db.DateTime(3)
+  version     Int      @default(0)
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  assignments RoleAssignment[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, key])
+  @@map("roles")
+}
+
+model RoleAssignment {
+  id          String   @id @default(uuid(7)) @db.Char(36)
+  tenantId    String   @db.Char(36)
+  identityId  String   @db.Char(36)
+  roleId      String   @db.Char(36)
+  grantedById String?  @db.Char(36)
+  reason      String   @db.VarChar(500)
+  createdAt   DateTime @default(now()) @db.DateTime(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  // Composite keys: an assignment can only join an identity and a role of the SAME tenant.
+  identity  Identity  @relation("assignee", fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
+  role      Role      @relation(fields: [tenantId, roleId], references: [tenantId, id], onDelete: Restrict)
+  grantedBy Identity? @relation("grantor", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@unique([identityId, roleId])
+  @@index([tenantId, roleId])
+  @@index([tenantId, identityId])
+  @@map("role_assignments")
+}
+
+model Session {
+  id            String    @id @default(uuid(7)) @db.Char(36)
+  tenantId      String    @db.Char(36)
+  identityId    String    @db.Char(36)
+  /// SHA-256 of the opaque session token. The token itself is never stored.
+  tokenHash     Bytes     @unique @db.Binary(32)
+  ipAddress     String?   @db.VarChar(45)
+  userAgent     String?   @db.VarChar(512)
+  createdAt     DateTime  @default(now()) @db.DateTime(3)
+  lastSeenAt    DateTime  @default(now()) @db.DateTime(3)
+  idleExpiresAt DateTime  @db.DateTime(3)
+  expiresAt     DateTime  @db.DateTime(3)
+  revokedAt     DateTime? @db.DateTime(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  identity Identity @relation(fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, identityId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Append-only. The application database user has no UPDATE or DELETE grant on this table
+/// in production (see deploy/oracle-linux/mysql/provision.sql).
+model AuditEvent {
+  id          String       @id @default(uuid(7)) @db.Char(36)
+  /// Null only for platform events that cannot be attributed to a tenant (e.g. unknown domain).
+  tenantId    String?      @db.Char(36)
+  occurredAt  DateTime     @default(now()) @db.DateTime(3)
+  action      String       @db.VarChar(64)
+  outcome     AuditOutcome
+  actorId     String?      @db.Char(36)
+  actorLabel  String       @db.VarChar(320)
+  targetType  String?      @db.VarChar(64)
+  targetId    String?      @db.VarChar(64)
+  targetLabel String?      @db.VarChar(320)
+  ipAddress   String?      @db.VarChar(45)
+  userAgent   String?      @db.VarChar(512)
+  requestId   String?      @db.VarChar(64)
+  metadata    Json
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, action, occurredAt])
+  @@index([tenantId, actorId, occurredAt])
+  @@map("audit_events")
+}
+
+/// Replay protection for non-idempotent POSTs carrying an `Idempotency-Key` header.
+model IdempotencyKey {
+  id             String   @id @default(uuid(7)) @db.Char(36)
+  tenantId       String   @db.Char(36)
+  key            String   @db.VarChar(128)
+  identityId     String   @db.Char(36)
+  requestHash    Bytes    @db.Binary(32)
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now()) @db.DateTime(3)
+  expiresAt      DateTime @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

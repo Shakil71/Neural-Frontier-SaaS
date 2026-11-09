@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false,
+    "noUncheckedIndexedAccess": false,
+    "declaration": false
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

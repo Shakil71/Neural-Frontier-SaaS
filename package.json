@@ -1,28 +1,46 @@
 {
-  "name": "neural-frontier-saas",
+  "name": "neural-frontier",
   "version": "0.1.0",
   "private": true,
+  "description": "Neural Frontier — AI-native enterprise platform (monorepo)",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12 <27"
   },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "next": "^16.4.5",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "build:packages": "npm run build -w @nf/contracts -w @nf/db",
+    "build": "npm run build:packages && npm run build -w @nf/api -w @nf/web",
+    "dev:api": "npm run dev -w @nf/api",
+    "dev:web": "npm run dev -w @nf/web",
+    "dev:idp": "npm run start -w @nf/dev-idp",
+    "db:generate": "npm run generate -w @nf/db",
+    "db:migrate": "npm run migrate:deploy -w @nf/db",
+    "db:seed": "npm run seed -w @nf/db",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:integration": "npm run test:integration -w @nf/api",
+    "test:e2e": "npm run test:e2e -w @nf/web",
+    "openapi": "npm run openapi -w @nf/api",
+    "license:check": "node tools/license-check.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.5",
-    "typescript": "^6.0.3"
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "globals": "17.14.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "prisma@7.10.1": true,
+    "@scarf/scarf": false
   }
 }

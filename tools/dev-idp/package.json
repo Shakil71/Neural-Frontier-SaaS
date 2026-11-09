@@ -1,0 +1,13 @@
+{
+  "name": "@nf/dev-idp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DEVELOPMENT/TEST ONLY OpenID Connect provider. Never deployed.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "oidc-provider": "9.13.3"
+  }
+}

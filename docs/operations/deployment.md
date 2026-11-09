@@ -51,6 +51,18 @@ Register an OIDC web application at the chosen IdP with redirect URI
 (and `NF_OIDC_REQUIRE_EMAIL_VERIFIED=false` only for IdPs such as Entra ID that omit the claim and are
 authoritative for the domain). `sudo systemctl restart neural-frontier-api`.
 
+### Self-hosted option (in use on this VPS): Keycloak
+
+```bash
+sudo deploy/oracle-linux/keycloak/install-keycloak.sh --public-url https://192.168.197.100:8643   --owner-email you@example.com --owner-first "First" --owner-last "Last"
+```
+
+Installs Keycloak 26.8.2 (Java 21 side by side, loopback :8481/:8482, MySQL database `keycloak`), serves it at
+`/auth`, creates realm `neural-frontier` and a confidential PKCE client, creates the owner with a temporary
+password (must be changed, plus authenticator-app enrolment, at first sign-in) and writes `NF_OIDC_*` into
+`api.env`. Admin console: `https://<host>:8643/auth/admin/` from private networks only; the `admin` password is
+in `/etc/keycloak/secrets.env`. Add more people there (Users → Add user, email verified), or they are refused.
+
 ## 3. Bootstrap the first tenant (once)
 
 ```bash

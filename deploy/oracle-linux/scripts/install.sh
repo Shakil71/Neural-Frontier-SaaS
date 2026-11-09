@@ -47,6 +47,8 @@ install -d -o root -g root -m 0755 "$STATE_DIR" "$ROOT_LIB"
 log "secrets (generated once, never overwritten)"
 SECRETS="$CONF_DIR/secrets.env"
 if [[ ! -f $SECRETS ]]; then
+  # Subshell: the restrictive umask must not leak to files created later (e.g. the public cert).
+  (
   umask 077
   cat >"$SECRETS" <<EOF
 NF_APP_DB_PASSWORD=$(rand 40)
@@ -54,6 +56,7 @@ NF_MIGRATE_DB_PASSWORD=$(rand 40)
 NF_REDIS_PASSWORD=$(rand 40)
 NF_SESSION_SECRET=$(rand 64)
 EOF
+  )
   chmod 0600 "$SECRETS"
 fi
 [[ -f "$CONF_DIR/backup.key" ]] || { (umask 077; openssl rand -base64 64 >"$CONF_DIR/backup.key"); }
@@ -102,8 +105,9 @@ if [[ ! -f "$TLS_DIR/selfsigned.crt" ]]; then
   openssl req -x509 -newkey rsa:3072 -sha256 -days 825 -nodes \
     -keyout "$TLS_DIR/selfsigned.key" -out "$TLS_DIR/selfsigned.crt" \
     -subj "/CN=Neural Frontier" -addext "subjectAltName=IP:${HOST_IP},DNS:localhost${EXTRA_SAN}" 2>/dev/null
-  chmod 0600 "$TLS_DIR/selfsigned.key"
 fi
+chmod 0600 "$TLS_DIR/selfsigned.key"
+chmod 0644 "$TLS_DIR/selfsigned.crt"   # public; the API trusts it via NODE_EXTRA_CA_CERTS
 restorecon -R "$TLS_DIR" || true
 
 log "SELinux and firewall"

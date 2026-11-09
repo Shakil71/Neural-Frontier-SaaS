@@ -16,9 +16,11 @@ source "$HERE/lib.sh"
 need_root
 
 PUBLIC_URL=""
+EXTRA_SAN=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     --public-url) PUBLIC_URL=$2; shift 2 ;;
+    --extra-ip) EXTRA_SAN="${EXTRA_SAN},IP:$2"; shift 2 ;;
     *) die "unknown argument $1" ;;
   esac
 done
@@ -99,7 +101,7 @@ if [[ ! -f "$TLS_DIR/selfsigned.crt" ]]; then
   HOST_IP=$(hostname -I | awk '{print $1}')
   openssl req -x509 -newkey rsa:3072 -sha256 -days 825 -nodes \
     -keyout "$TLS_DIR/selfsigned.key" -out "$TLS_DIR/selfsigned.crt" \
-    -subj "/CN=Neural Frontier" -addext "subjectAltName=IP:${HOST_IP},DNS:localhost" 2>/dev/null
+    -subj "/CN=Neural Frontier" -addext "subjectAltName=IP:${HOST_IP},DNS:localhost${EXTRA_SAN}" 2>/dev/null
   chmod 0600 "$TLS_DIR/selfsigned.key"
 fi
 restorecon -R "$TLS_DIR" || true

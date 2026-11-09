@@ -45,6 +45,16 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ ...prod, ...override })).toThrow(message);
   });
 
+  it("treats empty values (KEY=) as unset, as in the production env template", () => {
+    const c = loadConfig({
+      ...base,
+      NF_OIDC_ISSUER: "",
+      NF_OIDC_CLIENT_ID: "",
+      NF_OIDC_CLIENT_SECRET: " ",
+    });
+    expect(c.oidc).toBeNull();
+  });
+
   it("requires OIDC settings as a complete set", () => {
     expect(() => loadConfig({ ...base, NF_OIDC_ISSUER: "https://idp.example.com" })).toThrow(
       /set together/,

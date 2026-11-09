@@ -3,7 +3,8 @@ import { expect, type Page, test } from "@playwright/test";
 async function signInAs(page: Page, email: string) {
   await page.goto("/");
   await expect(page).toHaveURL(/\/sign-in\?returnTo=%2F/);
-  await page.getByRole("link", { name: /Continue with single sign-on/ }).click();
+  await page.getByLabel("Work email").fill(email);
+  await page.getByRole("button", { name: /Continue with single sign-on/ }).click();
   // Development IdP login form (any password).
   await page.locator('input[name="login"]').fill(email);
   await page.locator('input[name="password"]').fill("e2e");
@@ -22,7 +23,7 @@ test("unauthenticated visitors are sent to sign-in, with a nonce-based CSP", asy
 
 test("unknown organisations get a clear explanation", async ({ page }) => {
   await page.goto("/sign-in");
-  await page.getByRole("link", { name: /Continue with single sign-on/ }).click();
+  await page.getByRole("button", { name: /Continue with single sign-on/ }).click();
   await page.locator('input[name="login"]').fill("stranger@unknown-org.example");
   await page.locator('input[name="password"]').fill("e2e");
   await page.locator('button[type="submit"]').click();
@@ -149,4 +150,68 @@ test("owner creates a service principal; the secret is shown once and works", as
   await page.getByRole("button", { name: "Connect directory" }).first().click();
   await expect(page.getByRole("dialog", { name: "Connect Microsoft Entra ID" })).toBeVisible();
   await page.screenshot({ path: "test-results/screenshots/12-connect-directory-light.png" });
+});
+
+/** Fills the development IdP's login form (any password). */
+async function idpLogin(page: Page, email: string) {
+  await page.locator('input[name="login"]').fill(email);
+  await page.locator('input[name="password"]').fill("e2e");
+  await page.locator('button[type="submit"]').click();
+}
+
+// Runs last: it changes how the Acme tenant signs in.
+test("an organisation brings its own sign-in provider and can require it", async ({ page }) => {
+  await signInAs(page, "ada.owner@acme.example");
+  await page.goto("/settings");
+  await expect(
+    page.getByText(/Connect your provider|Your organisation's provider/).first(),
+  ).toBeVisible();
+
+  const connect = page.getByRole("button", { name: "Connect your provider" });
+  if (await connect.isVisible()) {
+    await connect.click();
+    const form = page.getByRole("dialog", { name: "Connect your sign-in provider" });
+    await form.getByLabel("Issuer URL").fill("http://localhost:3498");
+    await form.getByLabel("Client ID").fill("acme-own-idp");
+    await form.getByLabel("Client secret").fill("acme-own-secret-not-for-production");
+    await page.screenshot({ path: "test-results/screenshots/13-connect-sso-light.png" });
+    await form.getByRole("button", { name: "Connect provider" }).click();
+    await expect(page.getByText("Sign-in provider saved")).toBeVisible();
+  }
+  await expect(page.getByText("http://localhost:3498")).toBeVisible();
+
+  // Email-first sign-in now goes to the organisation's own provider (port 3498, not 3499).
+  await page.context().clearCookies();
+  await page.goto("/sign-in");
+  await page.getByLabel("Work email").fill("ada.owner@acme.example");
+  await page.getByRole("button", { name: /Continue with single sign-on/ }).click();
+  await expect(page).toHaveURL(/localhost:3498\//);
+  await idpLogin(page, "ada.owner@acme.example");
+  await expect(page).toHaveURL(/localhost:3400\/$/);
+
+  // Having signed in through it, the owner may require it.
+  await page.goto("/settings");
+  await expect(page.getByText("http://localhost:3498")).toBeVisible();
+  const requireButton = page.getByRole("button", { name: "Require for everyone" });
+  if (await requireButton.isVisible()) {
+    await requireButton.click();
+    const dialog = page.getByRole("dialog", { name: "Require your provider?" });
+    await dialog.getByLabel("Reason").fill("One front door with our MFA");
+    await dialog.getByRole("button", { name: "Require" }).click();
+    await expect(page.getByText("Provider is now required")).toBeVisible();
+  }
+  await expect(page.getByText("Required", { exact: true })).toBeVisible();
+  await page.waitForTimeout(400);
+  await page.screenshot({
+    path: "test-results/screenshots/14-sso-required-light.png",
+    fullPage: true,
+  });
+
+  // The deployment's shared provider is now refused for this organisation.
+  await page.context().clearCookies();
+  await page.goto("/sign-in");
+  await page.getByRole("button", { name: /Continue with single sign-on/ }).click();
+  await expect(page).toHaveURL(/localhost:3499\//);
+  await idpLogin(page, "ada.owner@acme.example");
+  await expect(page.getByText("requires its own sign-in provider")).toBeVisible();
 });

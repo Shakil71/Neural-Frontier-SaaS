@@ -116,6 +116,12 @@ export async function signIn(t: TestApp, tenantId: string, identityId: string) {
         .set("Cookie", cookie)
         .set("x-csrf-token", csrf)
         .set("Origin", PUBLIC_URL),
+    put: (url: string) =>
+      request(t.http)
+        .put(url)
+        .set("Cookie", cookie)
+        .set("x-csrf-token", csrf)
+        .set("Origin", PUBLIC_URL),
     delete: (url: string) =>
       request(t.http)
         .delete(url)

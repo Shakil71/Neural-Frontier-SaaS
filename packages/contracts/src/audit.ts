@@ -23,6 +23,9 @@ export const AUDIT_ACTIONS = [
   "service_principal.secret_revoked",
   "service_principal.token_issued",
   "service_principal.auth_failed",
+  "tenant.idp_configured",
+  "tenant.idp_removed",
+  "tenant.idp_enforcement_changed",
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

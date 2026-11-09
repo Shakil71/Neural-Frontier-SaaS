@@ -61,6 +61,7 @@ model Tenant {
   jobs                    Job[]
   servicePrincipals       ServicePrincipal[]
   servicePrincipalSecrets ServicePrincipalSecret[]
+  identityProvider        TenantIdentityProvider?
 
   @@map("tenants")
 }
@@ -450,4 +451,32 @@ model ServicePrincipalSecret {
 
   @@index([tenantId, servicePrincipalId])
   @@map("service_principal_secrets")
+}
+
+// ───────────── Phase 2b: per-tenant single sign-on ─────────────
+
+enum IdpEnforcement {
+  optional
+  required
+}
+
+/// A tenant's own OpenID Connect provider. It can only sign people in to this tenant.
+/// The client secret is sealed with NF_DATA_KEY (AES-256-GCM) and never returned.
+model TenantIdentityProvider {
+  id                   String         @id @default(uuid(7)) @db.Char(36)
+  tenantId             String         @unique @db.Char(36)
+  issuer               String         @db.VarChar(512)
+  clientId             String         @db.VarChar(255)
+  secretCiphertext     Bytes          @db.VarBinary(2048)
+  secretHint           String         @db.VarChar(16)
+  requireEmailVerified Boolean        @default(true)
+  enforcement          IdpEnforcement @default(optional)
+  createdById          String?        @db.Char(36)
+  createdAt            DateTime       @default(now()) @db.DateTime(3)
+  updatedAt            DateTime       @updatedAt @db.DateTime(3)
+  version              Int            @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@map("tenant_identity_providers")
 }

@@ -24,6 +24,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "Job",
   "ServicePrincipal",
   "ServicePrincipalSecret",
+  "TenantIdentityProvider",
 ]);
 
 const READ_OR_FILTERED_WRITE = new Set([

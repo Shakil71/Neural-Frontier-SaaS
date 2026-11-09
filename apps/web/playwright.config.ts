@@ -42,6 +42,17 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
+      // A second, separate provider: an organisation's own IdP (per-tenant SSO tests).
+      command: "node ../../tools/dev-idp/server.js",
+      url: "http://localhost:3498/.well-known/openid-configuration",
+      env: {
+        DEV_IDP_PORT: "3498",
+        DEV_IDP_CLIENT_ID: "acme-own-idp",
+        DEV_IDP_CLIENT_SECRET: "acme-own-secret-not-for-production",
+      },
+      reuseExistingServer: !process.env.CI,
+    },
+    {
       command: "node ../api/dist/main.js",
       url: "http://127.0.0.1:3401/api/health/ready",
       env: apiEnv,

@@ -6,6 +6,7 @@
 export const PERMISSIONS = {
   "tenant.read": "View tenant profile and settings",
   "tenant.manage": "Change tenant profile and settings",
+  "tenant.sso.manage": "Configure the tenant's own single sign-on provider",
   "identities.read": "View identities in the tenant",
   "identities.manage": "Suspend, reactivate and edit identities",
   "roles.read": "View roles and role assignments",

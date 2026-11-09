@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Building2, Globe, KeyRound } from "lucide-react";
+import { BadgeCheck, Building2, Globe } from "lucide-react";
 import { z } from "zod";
 import { PageHeader } from "@/components/shell/page-header";
 import { ErrorState, ForbiddenState } from "@/components/states/states";
@@ -9,6 +9,7 @@ import { Badge, Card, CardBody, CardHeader, Skeleton } from "@/components/ui/pri
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { usePermissions } from "@/lib/session";
+import { IdentityProviderCard } from "./identity-provider-card";
 
 const TenantSchema = z.object({
   id: z.string(),
@@ -17,7 +18,11 @@ const TenantSchema = z.object({
   status: z.enum(["active", "suspended"]),
   createdAt: z.string(),
   domains: z.array(z.object({ domain: z.string(), verified: z.boolean() })),
-  sso: z.object({ protocol: z.string(), configured: z.boolean() }),
+  sso: z.object({
+    protocol: z.string(),
+    configured: z.boolean(),
+    sharedConfigured: z.boolean().optional(),
+  }),
 });
 
 export function Settings() {
@@ -121,22 +126,7 @@ export function Settings() {
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader
-              title="Single sign-on"
-              action={<KeyRound className="size-4 text-subtle" aria-hidden />}
-            />
-            <CardBody className="flex items-start gap-4">
-              <div className="flex-1 text-[13px] leading-relaxed text-muted">
-                {t.sso.configured
-                  ? "Sign-in uses OpenID Connect (authorization code flow with PKCE). Identities are bound to their identity-provider subject on first sign-in."
-                  : "No identity provider is configured for this deployment, so nobody can sign in. Set the NF_OIDC_* settings on the server."}
-              </div>
-              <Badge tone={t.sso.configured ? "success" : "warning"} dot>
-                {t.sso.configured ? "OIDC active" : "Not configured"}
-              </Badge>
-            </CardBody>
-          </Card>
+          <IdentityProviderCard sharedConfigured={t.sso.sharedConfigured ?? t.sso.configured} />
         </div>
       )}
     </>

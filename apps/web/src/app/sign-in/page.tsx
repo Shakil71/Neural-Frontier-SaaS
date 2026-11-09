@@ -1,7 +1,8 @@
-import { ArrowRight, Fingerprint, ShieldCheck, TriangleAlert } from "lucide-react";
+import { ShieldCheck, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import { LogoMark } from "@/components/brand/logo";
 import { SIGN_IN_ERRORS } from "@/lib/audit-labels";
+import { SignInForm } from "./sign-in-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -137,17 +138,7 @@ export default async function SignInPage({
             </div>
           )}
 
-          <a
-            href={`/api/v1/auth/login?returnTo=${encodeURIComponent(returnTo)}`}
-            className="group mt-8 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg bg-primary-solid text-[15px] font-medium text-primary-foreground shadow-[0_1px_0_0_oklch(1_0_0/0.18)_inset,0_10px_30px_-10px_var(--primary-glow)] transition-colors hover:bg-primary-solid-hover"
-          >
-            <Fingerprint className="size-[18px]" aria-hidden />
-            Continue with single sign-on
-            <ArrowRight
-              className="size-4 transition-transform group-hover:translate-x-0.5"
-              aria-hidden
-            />
-          </a>
+          <SignInForm returnTo={returnTo} />
 
           <div className="mt-10 flex items-start gap-3 rounded-xl border border-border bg-surface/60 p-4 backdrop-blur">
             <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-success" aria-hidden />

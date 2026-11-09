@@ -1,6 +1,7 @@
 import type { AuditAction } from "@nf/contracts";
 import {
   Bot,
+  Fingerprint,
   Cable,
   CircleCheck,
   CircleX,
@@ -60,6 +61,17 @@ export const AUDIT_LABELS: Record<
     icon: ShieldAlert,
     tone: "danger",
   },
+  "tenant.idp_configured": {
+    label: "Sign-in provider configured",
+    icon: Fingerprint,
+    tone: "warning",
+  },
+  "tenant.idp_removed": { label: "Sign-in provider removed", icon: Fingerprint, tone: "danger" },
+  "tenant.idp_enforcement_changed": {
+    label: "Sign-in provider requirement changed",
+    icon: Fingerprint,
+    tone: "warning",
+  },
 };
 
 export function auditLabel(action: string) {
@@ -88,4 +100,8 @@ export const SIGN_IN_ERRORS: Record<string, string> = {
   tenant_suspended: "Your organisation's access is suspended.",
   subject_mismatch:
     "This email is already linked to a different sign-in account. Contact your administrator.",
+  idp_tenant_mismatch:
+    "Your organisation's identity provider can only sign you in to your own organisation. Check the email address you entered.",
+  tenant_idp_required:
+    "Your organisation requires its own sign-in provider. Enter your work email above to be sent there.",
 };

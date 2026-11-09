@@ -8,3 +8,4 @@ export * from "./platform.js";
 export * from "./connectors.js";
 export * from "./directory.js";
 export * from "./service-principals.js";
+export * from "./identity-provider.js";

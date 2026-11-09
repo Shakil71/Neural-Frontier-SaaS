@@ -47,10 +47,20 @@ export class AuthController {
   @Public()
   @Throttle(AUTH_THROTTLE)
   @Get("login")
-  async login(@Query("returnTo") returnTo: unknown, @Res() res: Response) {
-    if (!this.oidc.configured)
-      return res.redirect(303, this.web("/sign-in?error=sso_not_configured"));
-    const { url, state } = await this.oidc.beginLogin(safeReturnTo(returnTo));
+  async login(
+    @Query("returnTo") returnTo: unknown,
+    @Query("email") emailParam: unknown,
+    @Res() res: Response,
+  ) {
+    // Email-first sign-in: the address only chooses the provider (and pre-fills it there).
+    // It proves nothing; identity comes from the provider's signed ID token.
+    const email =
+      typeof emailParam === "string" && /^[^\s@]{1,64}@[^\s@]{1,253}$/.test(emailParam.trim())
+        ? emailParam.trim().toLowerCase()
+        : null;
+    const provider = await this.oidc.chooseProvider(email);
+    if (!provider) return res.redirect(303, this.web("/sign-in?error=sso_not_configured"));
+    const { url, state } = await this.oidc.beginLogin(safeReturnTo(returnTo), provider, email);
     res.cookie(
       this.config.cookie.loginStateName,
       await sealLoginState(this.config.sessionSecret, state),
@@ -73,15 +83,15 @@ export class AuthController {
     if (!state) return res.redirect(303, this.web("/sign-in?error=login_expired"));
 
     const callbackUrl = new URL(req.originalUrl, this.oidc.redirectUri);
-    let claims;
+    let completed;
     try {
-      claims = await this.oidc.completeLogin(callbackUrl, state);
+      completed = await this.oidc.completeLogin(callbackUrl, state);
     } catch (err) {
       req.log?.warn({ err }, "OIDC callback rejected");
       return res.redirect(303, this.web("/sign-in?error=sso_failed"));
     }
 
-    const result = await this.provisioning.signIn(claims, meta);
+    const result = await this.provisioning.signIn(completed.claims, meta, completed.context);
     if (!result.ok) return res.redirect(303, this.web(`/sign-in?error=${result.reason}`));
 
     const { token } = await this.sessions.create(result.tenantId, result.identityId, meta);

@@ -219,6 +219,58 @@
         ]
       }
     },
+    "/api/v1/tenant/identity-provider": {
+      "get": {
+        "operationId": "TenantController_getIdp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      },
+      "put": {
+        "operationId": "TenantController_upsertIdp",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      },
+      "delete": {
+        "operationId": "TenantController_removeIdp",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenant/identity-provider/enforcement": {
+      "patch": {
+        "operationId": "TenantController_setEnforcement",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
     "/api/v1/dashboard/summary": {
       "get": {
         "operationId": "DashboardController_summary",

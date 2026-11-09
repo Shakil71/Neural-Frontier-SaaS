@@ -32,6 +32,7 @@ import { MetricsController, MetricsMiddleware } from "./modules/metrics/metrics.
 import { RolesController } from "./modules/roles/roles.controller.js";
 import { RolesService } from "./modules/roles/roles.service.js";
 import { TenantController } from "./modules/tenant/tenant.controller.js";
+import { IdentityProviderService } from "./modules/tenant/identity-provider.service.js";
 import { RoleCatalogSync } from "./modules/authz/role-catalog-sync.js";
 import { BearerResolver } from "./modules/auth/security.guard.js";
 import { ConnectorsController } from "./modules/connectors/connectors.controller.js";
@@ -124,6 +125,7 @@ export class AppModule implements NestModule {
         ServicePrincipalsService,
         { provide: BearerResolver, useExisting: ServicePrincipalsService },
         RoleCatalogSync,
+        IdentityProviderService,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

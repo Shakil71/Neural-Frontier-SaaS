@@ -1,5 +1,6 @@
 import { hkdfSync } from "node:crypto";
 import { EncryptJWT, jwtDecrypt } from "jose";
+import type { ProviderKey } from "./oidc.service.js";
 
 /** Data carried through the IdP round-trip in an encrypted, short-lived cookie. */
 export interface LoginState {
@@ -7,6 +8,8 @@ export interface LoginState {
   nonce: string;
   codeVerifier: string;
   returnTo: string;
+  /** Which provider the sign-in started at; the callback must complete with the same one. */
+  provider: ProviderKey;
 }
 
 const TTL_SECONDS = 600;
@@ -31,9 +34,14 @@ export async function openLoginState(
   if (!sealed) return null;
   try {
     const { payload } = await jwtDecrypt(sealed, keyFrom(secret));
-    const { state, nonce, codeVerifier, returnTo } = payload as Record<string, unknown>;
+    const { state, nonce, codeVerifier, returnTo, provider } = payload as Record<string, unknown>;
     if ([state, nonce, codeVerifier, returnTo].some((v) => typeof v !== "string")) return null;
-    return { state, nonce, codeVerifier, returnTo } as LoginState;
+    // Cookies sealed before per-tenant providers existed carry no provider: they used the global one.
+    const key = provider ?? "global";
+    if (typeof key !== "string" || !(key === "global" || /^tenant:[0-9a-f-]{36}$/.test(key))) {
+      return null;
+    }
+    return { state, nonce, codeVerifier, returnTo, provider: key } as LoginState;
   } catch {
     return null;
   }

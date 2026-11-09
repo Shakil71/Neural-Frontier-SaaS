@@ -16,6 +16,7 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 | -------------------------------------------------------------- | ------------ | ------------- |
 | Multi-tenant data model with enforced isolation                | Native       | ✅ Built      |
 | OIDC single sign-on (any compliant IdP), PKCE                  | Native       | ✅ Built      |
+| Per-tenant OIDC provider, email-first sign-in, enforcement     | Native       | ✅ Built (2b) |
 | Server-side sessions, idle/absolute expiry, revocation         | Native       | ✅ Built      |
 | RBAC with built-in roles, separation of duties                 | Native       | ✅ Built      |
 | Append-only audit log (UI + API)                               | Native       | ✅ Built      |

@@ -120,6 +120,8 @@ export interface AppConfig {
   autoProvision: boolean;
   apiDocs: boolean;
   roleSyncOnStart: boolean;
+  /** Allow http:// OIDC issuers (development and tests only; refused in production). */
+  oidcAllowInsecureHttp: boolean;
   /** Null outside production when NF_DATA_KEY is unset; connectors are then unavailable. */
   dataKey: Buffer | null;
   graph: { authorityUrl: string; apiUrl: string };
@@ -182,6 +184,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     autoProvision: e.NF_AUTO_PROVISION,
     apiDocs: e.NF_API_DOCS,
     roleSyncOnStart: e.NF_ROLE_SYNC_ON_START,
+    oidcAllowInsecureHttp: e.NF_OIDC_ALLOW_INSECURE_HTTP,
     dataKey: e.NF_DATA_KEY ? Buffer.from(e.NF_DATA_KEY, "base64") : null,
     graph: {
       authorityUrl: e.NF_GRAPH_AUTHORITY_URL.replace(/\/+$/, ""),

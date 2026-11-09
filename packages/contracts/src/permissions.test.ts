@@ -25,12 +25,15 @@ describe("permission catalog", () => {
     expect([...BUILT_IN_ROLES.owner.permissions].sort()).toEqual([...ALL_PERMISSIONS].sort());
   });
 
-  it("only the owner can manage service principals", () => {
-    const holders = Object.entries(BUILT_IN_ROLES)
-      .filter(([, r]) => (r.permissions as readonly string[]).includes("service_principals.manage"))
-      .map(([k]) => k);
-    expect(holders).toEqual(["owner"]);
-  });
+  it.each(["service_principals.manage", "tenant.sso.manage"])(
+    "only the owner holds %s",
+    (permission) => {
+      const holders = Object.entries(BUILT_IN_ROLES)
+        .filter(([, r]) => (r.permissions as readonly string[]).includes(permission))
+        .map(([k]) => k);
+      expect(holders).toEqual(["owner"]);
+    },
+  );
 
   it("machine permissions never include escalation paths", () => {
     for (const p of [

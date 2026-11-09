@@ -42,7 +42,7 @@ export async function toApiError(res: Response): Promise<ApiRequestError> {
 }
 
 interface RequestOptions<T extends z.ZodType> {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
   /** Validate the response against the shared contract. */

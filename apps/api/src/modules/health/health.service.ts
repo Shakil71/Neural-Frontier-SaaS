@@ -38,6 +38,44 @@ export class HealthService {
     private readonly oidc: OidcService,
   ) {}
 
+  /**
+   * Background worker health, inferred from the queue: runnable jobs waiting more than five
+   * minutes mean no worker is claiming them. Informational: it does not fail readiness, so a
+   * stopped worker never blocks an API deploy or rollback.
+   */
+  private async jobQueue(): Promise<DependencyStatus> {
+    const started = performance.now();
+    try {
+      const now = Date.now();
+      const [stale, queued, running, dead] = await Promise.all([
+        this.database.system.job.count({
+          where: { status: "queued", runAt: { lt: new Date(now - 5 * 60_000) } },
+        }),
+        this.database.system.job.count({ where: { status: "queued" } }),
+        this.database.system.job.count({ where: { status: "running" } }),
+        this.database.system.job.count({
+          where: { status: "dead", finishedAt: { gt: new Date(now - 86_400_000) } },
+        }),
+      ]);
+      return {
+        name: "jobs",
+        status: stale > 0 ? "down" : "up",
+        latencyMs: Math.round(performance.now() - started),
+        detail:
+          stale > 0
+            ? `${stale} job(s) waiting over 5 minutes — is neural-frontier-worker running?`
+            : `${queued} queued · ${running} running · ${dead} failed in 24 h`,
+      };
+    } catch (err) {
+      return {
+        name: "jobs",
+        status: "down",
+        latencyMs: null,
+        detail: err instanceof Error ? err.message : "error",
+      };
+    }
+  }
+
   async report(): Promise<HealthReport> {
     const deps: DependencyStatus[] = [await timed("mysql", () => this.database.ping())];
     deps.push(
@@ -45,6 +83,7 @@ export class HealthService {
         ? await timed("redis", () => this.redis.ping())
         : { name: "redis", status: "not_configured", latencyMs: null },
     );
+    deps.push(await this.jobQueue());
     deps.push({
       name: "sso",
       status: this.oidc.configured ? "up" : "not_configured",

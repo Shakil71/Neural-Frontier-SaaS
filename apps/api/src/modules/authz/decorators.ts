@@ -10,3 +10,11 @@ export const Public = () => SetMetadata(PUBLIC_KEY, true);
 /** Route requires this permission in the caller's tenant. Checked centrally by SecurityGuard. */
 export const RequirePermission = (permission: Permission) =>
   SetMetadata(PERMISSION_KEY, permission);
+
+export const MACHINE_ACCESS_KEY = "nf:machine-access";
+
+/**
+ * Service principals (bearer tokens) may call this route. Every other route is for people
+ * only: machine access is opt-in per route, on top of the permission check.
+ */
+export const MachineAccess = () => SetMetadata(MACHINE_ACCESS_KEY, true);

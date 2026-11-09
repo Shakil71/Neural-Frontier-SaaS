@@ -2,7 +2,15 @@
 
 import { HealthReportSchema } from "@nf/contracts";
 import { useQuery } from "@tanstack/react-query";
-import { Database, KeyRound, type LucideIcon, RefreshCw, Server, Zap } from "lucide-react";
+import {
+  Database,
+  KeyRound,
+  type LucideIcon,
+  RefreshCw,
+  Server,
+  Workflow,
+  Zap,
+} from "lucide-react";
 import { PageHeader } from "@/components/shell/page-header";
 import { ErrorState, ForbiddenState } from "@/components/states/states";
 import { Button } from "@/components/ui/button";
@@ -16,6 +24,7 @@ const DEP: Record<string, { label: string; icon: LucideIcon; role: string }> = {
   mysql: { label: "MySQL", icon: Database, role: "Operational database" },
   redis: { label: "Redis", icon: Zap, role: "Rate limiting and caching" },
   sso: { label: "Single sign-on", icon: KeyRound, role: "OpenID Connect identity provider" },
+  jobs: { label: "Background worker", icon: Workflow, role: "Job queue: directory sync" },
 };
 
 function uptime(seconds: number) {

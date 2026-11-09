@@ -32,9 +32,22 @@ import { MetricsController, MetricsMiddleware } from "./modules/metrics/metrics.
 import { RolesController } from "./modules/roles/roles.controller.js";
 import { RolesService } from "./modules/roles/roles.service.js";
 import { TenantController } from "./modules/tenant/tenant.controller.js";
+import { RoleCatalogSync } from "./modules/authz/role-catalog-sync.js";
+import { BearerResolver } from "./modules/auth/security.guard.js";
+import { ConnectorsController } from "./modules/connectors/connectors.controller.js";
+import { ConnectorsService } from "./modules/connectors/connectors.service.js";
+import { DirectoryController } from "./modules/directory/directory.controller.js";
+import { DirectoryService } from "./modules/directory/directory.service.js";
+import { JobQueue } from "./modules/jobs/job-queue.js";
+import {
+  OAuthController,
+  ServicePrincipalsController,
+} from "./modules/machine-identity/service-principals.controller.js";
+import { ServicePrincipalsService } from "./modules/machine-identity/service-principals.service.js";
 
 /**
- * Modular monolith root. Domains (auth, authz, audit, identities, roles, tenant, dashboard)
+ * Modular monolith root. Domains (auth, authz, audit, identities, roles, tenant, dashboard, connectors,
+ * directory, machine identity, jobs)
  * are separate folders with explicit service boundaries; extract to services only when
  * scale or isolation requires it (see docs/adr/0002-modular-monolith.md).
  */
@@ -90,6 +103,10 @@ export class AppModule implements NestModule {
         DashboardController,
         HealthController,
         MetricsController,
+        ConnectorsController,
+        DirectoryController,
+        ServicePrincipalsController,
+        OAuthController,
       ],
       providers: [
         AuditService,
@@ -101,6 +118,12 @@ export class AppModule implements NestModule {
         RolesService,
         DashboardService,
         HealthService,
+        JobQueue,
+        ConnectorsService,
+        DirectoryService,
+        ServicePrincipalsService,
+        { provide: BearerResolver, useExisting: ServicePrincipalsService },
+        RoleCatalogSync,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

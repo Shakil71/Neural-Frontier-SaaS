@@ -33,10 +33,11 @@ expect_mode() {
 }
 for f in api.env web.env migrate.env; do expect_mode "$f" 640; done
 for f in secrets.env backup.key; do expect_mode "$f" 600; done
+check "api.env has NF_DATA_KEY (connector credential encryption)" grep -q "^NF_DATA_KEY=." "$CONF_DIR/api.env"
 check "nginx configuration valid" nginx -t
 
 echo "Services"
-for u in "$API_UNIT" "$WEB_UNIT" neural-frontier-backup.timer; do
+for u in "$API_UNIT" "$WEB_UNIT" "$WORKER_UNIT" neural-frontier-backup.timer; do
   check "$u active" systemctl is-active "$u"
 done
 check "API listens on 127.0.0.1:$API_PORT only" bash -c "ss -tln | grep -q '127.0.0.1:$API_PORT '"

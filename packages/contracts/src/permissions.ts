@@ -12,6 +12,12 @@ export const PERMISSIONS = {
   "roles.assign": "Grant and revoke role assignments",
   "audit.read": "View the tenant audit log",
   "system.health.read": "View platform health and service status",
+  "directory.read": "View users and groups synced from external directories",
+  "connectors.read": "View directory connectors and their sync history",
+  "connectors.manage": "Create, change and delete directory connectors",
+  "connectors.sync": "Start a directory sync",
+  "service_principals.read": "View service principals (machine identities)",
+  "service_principals.manage": "Create service principals and issue or revoke their secrets",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -20,6 +26,28 @@ export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
 
 export function isPermission(value: string): value is Permission {
   return Object.prototype.hasOwnProperty.call(PERMISSIONS, value);
+}
+
+/**
+ * Permissions a service principal may hold. Deliberately excludes anything that changes who
+ * can do what (roles, identities, tenant settings, other service principals, connector
+ * credentials): automation can read and trigger syncs, never escalate.
+ */
+export const MACHINE_PERMISSIONS = [
+  "tenant.read",
+  "identities.read",
+  "roles.read",
+  "audit.read",
+  "system.health.read",
+  "directory.read",
+  "connectors.read",
+  "connectors.sync",
+] as const satisfies readonly Permission[];
+
+export type MachinePermission = (typeof MACHINE_PERMISSIONS)[number];
+
+export function isMachinePermission(value: string): value is MachinePermission {
+  return (MACHINE_PERMISSIONS as readonly string[]).includes(value);
 }
 
 /** Built-in roles provisioned for every tenant. Keys are stable identifiers. */
@@ -31,7 +59,7 @@ export const BUILT_IN_ROLES = {
   },
   administrator: {
     name: "Administrator",
-    description: "Manages identities and settings. Cannot grant roles.",
+    description: "Manages identities, connectors and settings. Cannot grant roles.",
     permissions: [
       "tenant.read",
       "tenant.manage",
@@ -40,12 +68,25 @@ export const BUILT_IN_ROLES = {
       "roles.read",
       "audit.read",
       "system.health.read",
+      "directory.read",
+      "connectors.read",
+      "connectors.manage",
+      "connectors.sync",
+      "service_principals.read",
     ],
   },
   security_auditor: {
     name: "Security Auditor",
-    description: "Read-only access to identities, roles and the audit log.",
-    permissions: ["tenant.read", "identities.read", "roles.read", "audit.read"],
+    description: "Read-only access to identities, roles, directory data and the audit log.",
+    permissions: [
+      "tenant.read",
+      "identities.read",
+      "roles.read",
+      "audit.read",
+      "directory.read",
+      "connectors.read",
+      "service_principals.read",
+    ],
   },
   member: {
     name: "Member",

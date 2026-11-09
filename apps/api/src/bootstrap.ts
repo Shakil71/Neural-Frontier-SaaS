@@ -26,6 +26,8 @@ export async function createApp(config: AppConfig, opts: { bufferLogs?: boolean 
   );
   app.use(cookieParser());
   app.useBodyParser("json", { limit: "256kb" });
+  // The OAuth token endpoint accepts form-encoded requests (RFC 6749).
+  app.useBodyParser("urlencoded", { limit: "16kb", extended: false });
   app.setGlobalPrefix("api");
   app.enableShutdownHooks();
 

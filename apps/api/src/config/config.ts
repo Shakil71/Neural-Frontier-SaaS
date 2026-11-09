@@ -49,6 +49,20 @@ const EnvSchema = z
     NF_AUTO_PROVISION: bool(true),
 
     NF_API_DOCS: bool(false),
+    /** Bring built-in roles up to the code catalog at start-up (off for offline tools). */
+    NF_ROLE_SYNC_ON_START: bool(true),
+
+    /** 32 random bytes, base64. Encrypts connector credentials at rest (AES-256-GCM). */
+    NF_DATA_KEY: z
+      .string()
+      .refine((v) => Buffer.from(v, "base64").length === 32, "must be 32 bytes, base64-encoded")
+      .optional(),
+    NF_GRAPH_AUTHORITY_URL: z.url().default("https://login.microsoftonline.com"),
+    NF_GRAPH_API_URL: z.url().default("https://graph.microsoft.com"),
+    NF_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
+    NF_WORKER_TENANT_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
+    NF_WORKER_POLL_MS: z.coerce.number().int().min(50).max(60_000).default(2000),
+    NF_JOB_LEASE_SECONDS: z.coerce.number().int().min(5).max(3600).default(120),
   })
   .superRefine((env, ctx) => {
     const prod = env.NODE_ENV === "production";
@@ -66,6 +80,8 @@ const EnvSchema = z
       });
     if (prod && !env.REDIS_URL)
       ctx.addIssue({ code: "custom", path: ["REDIS_URL"], message: "is required in production" });
+    if (prod && !env.NF_DATA_KEY)
+      ctx.addIssue({ code: "custom", path: ["NF_DATA_KEY"], message: "is required in production" });
     if (prod && !env.NF_PUBLIC_URL.startsWith("https://"))
       ctx.addIssue({
         code: "custom",
@@ -103,6 +119,11 @@ export interface AppConfig {
   } | null;
   autoProvision: boolean;
   apiDocs: boolean;
+  roleSyncOnStart: boolean;
+  /** Null outside production when NF_DATA_KEY is unset; connectors are then unavailable. */
+  dataKey: Buffer | null;
+  graph: { authorityUrl: string; apiUrl: string };
+  worker: { concurrency: number; tenantConcurrency: number; pollMs: number; leaseMs: number };
 }
 
 export const APP_CONFIG = Symbol("APP_CONFIG");
@@ -160,5 +181,17 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
         : null,
     autoProvision: e.NF_AUTO_PROVISION,
     apiDocs: e.NF_API_DOCS,
+    roleSyncOnStart: e.NF_ROLE_SYNC_ON_START,
+    dataKey: e.NF_DATA_KEY ? Buffer.from(e.NF_DATA_KEY, "base64") : null,
+    graph: {
+      authorityUrl: e.NF_GRAPH_AUTHORITY_URL.replace(/\/+$/, ""),
+      apiUrl: e.NF_GRAPH_API_URL.replace(/\/+$/, ""),
+    },
+    worker: {
+      concurrency: e.NF_WORKER_CONCURRENCY,
+      tenantConcurrency: e.NF_WORKER_TENANT_CONCURRENCY,
+      pollMs: e.NF_WORKER_POLL_MS,
+      leaseMs: e.NF_JOB_LEASE_SECONDS * 1000,
+    },
   };
 }

@@ -6,8 +6,8 @@ import { loadConfig } from "../../config/config.js";
 import { AppError } from "../../common/errors.js";
 import type { Principal } from "../../common/principal.js";
 import type { AuditService } from "../audit/audit.service.js";
-import { PERMISSION_KEY, PUBLIC_KEY } from "../authz/decorators.js";
-import { SecurityGuard } from "./security.guard.js";
+import { MACHINE_ACCESS_KEY, PERMISSION_KEY, PUBLIC_KEY } from "../authz/decorators.js";
+import { type BearerResolver, SecurityGuard } from "./security.guard.js";
 import type { SessionService } from "./session.service.js";
 import { csrfTokenFor } from "./tokens.js";
 
@@ -18,6 +18,7 @@ const config = loadConfig({
 });
 
 const principal: Principal = {
+  kind: "user",
   sessionId: "0192f1a0-0000-7000-8000-00000000000a",
   identityId: "0192f1a0-0000-7000-8000-00000000000b",
   tenantId: "0192f1a0-0000-7000-8000-00000000000c",
@@ -25,6 +26,16 @@ const principal: Principal = {
   displayName: "Ada",
   permissions: new Set<Permission>(["identities.read"]),
   sessionExpiresAt: new Date(Date.now() + 3_600_000),
+};
+
+const machine: Principal = {
+  ...principal,
+  kind: "service",
+  sessionId: "token-jti",
+  identityId: "0192f1a0-0000-7000-8000-00000000000d",
+  email: "service:sync-bot",
+  displayName: "sync-bot",
+  permissions: new Set<Permission>(["directory.read", "connectors.sync"]),
 };
 
 function context(opts: {
@@ -57,15 +68,65 @@ describe("SecurityGuard", () => {
   let record: ReturnType<typeof vi.fn>;
   let guard: SecurityGuard;
 
+  let resolveBearer: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     resolve = vi.fn(async (token: string) => (token === "good" ? principal : null));
+    resolveBearer = vi.fn(async (token: string) => (token === "machine.token" ? machine : null));
     record = vi.fn(async () => undefined);
     guard = new SecurityGuard(
       new Reflector(),
       config,
       { resolve } as unknown as SessionService,
       { record } as unknown as AuditService,
+      { resolveBearer } as unknown as BearerResolver,
     );
+  });
+
+  describe("service principals (bearer tokens)", () => {
+    const bearer = { authorization: "Bearer machine.token" };
+
+    it("rejects malformed and unknown bearer tokens without trying the cookie", async () => {
+      for (const authorization of ["Bearer nope", "Basic abc", "Bearer a b", "bearer x"]) {
+        expect(
+          await code(
+            guard.canActivate(context({ cookie: "good", headers: { authorization } }).ctx),
+          ),
+        ).toBe("unauthenticated");
+      }
+      expect(resolve).not.toHaveBeenCalled();
+    });
+
+    it("refuses routes that are not opened to machines, even with the permission", async () => {
+      const { ctx } = context({ headers: bearer, meta: { [PERMISSION_KEY]: "directory.read" } });
+      expect(await code(guard.canActivate(ctx))).toBe("forbidden");
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "authz.denied",
+          metadata: expect.objectContaining({
+            reason: "route_not_available_to_service_principals",
+          }),
+        }),
+      );
+    });
+
+    it("allows @MachineAccess routes with the permission and skips CSRF", async () => {
+      const { ctx, req } = context({
+        method: "POST",
+        headers: bearer,
+        meta: { [PERMISSION_KEY]: "connectors.sync", [MACHINE_ACCESS_KEY]: true },
+      });
+      expect(await guard.canActivate(ctx)).toBe(true);
+      expect(req.principal).toBe(machine);
+    });
+
+    it("still enforces permissions on @MachineAccess routes", async () => {
+      const { ctx } = context({
+        headers: bearer,
+        meta: { [PERMISSION_KEY]: "audit.read", [MACHINE_ACCESS_KEY]: true },
+      });
+      expect(await code(guard.canActivate(ctx))).toBe("forbidden");
+    });
   });
 
   const code = async (p: Promise<unknown>) => {

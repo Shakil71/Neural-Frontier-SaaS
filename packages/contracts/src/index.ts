@@ -5,3 +5,6 @@ export * from "./identities.js";
 export * from "./roles.js";
 export * from "./audit.js";
 export * from "./platform.js";
+export * from "./connectors.js";
+export * from "./directory.js";
+export * from "./service-principals.js";

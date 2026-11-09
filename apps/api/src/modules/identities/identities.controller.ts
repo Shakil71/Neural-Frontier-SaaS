@@ -4,7 +4,7 @@ import { IdentityListQuerySchema, UpdateIdentityStatusSchema } from "@nf/contrac
 import type { Principal, RequestMeta } from "../../common/principal.js";
 import { CurrentPrincipal, Meta } from "../../common/request.js";
 import { parse } from "../../common/validation.js";
-import { RequirePermission } from "../authz/decorators.js";
+import { MachineAccess, RequirePermission } from "../authz/decorators.js";
 import { IdentitiesService } from "./identities.service.js";
 
 @ApiTags("identities")
@@ -13,12 +13,14 @@ export class IdentitiesController {
   constructor(private readonly identities: IdentitiesService) {}
 
   @Get()
+  @MachineAccess()
   @RequirePermission("identities.read")
   list(@CurrentPrincipal() p: Principal, @Query() query: unknown) {
     return this.identities.list(p.tenantId, parse(IdentityListQuerySchema, query));
   }
 
   @Get(":id")
+  @MachineAccess()
   @RequirePermission("identities.read")
   get(@CurrentPrincipal() p: Principal, @Param("id", new ParseUUIDPipe()) id: string) {
     return this.identities.get(p.tenantId, id);

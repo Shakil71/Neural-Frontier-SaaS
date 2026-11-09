@@ -23,9 +23,10 @@ for bin in rsync mysql curl npx; do command -v "$bin" >/dev/null || die "missing
 for f in api.env web.env migrate.env; do
   [[ -r "$CONF_DIR/$f" ]] || die "$CONF_DIR/$f missing — run install.sh on the host first"
 done
-for u in "$API_UNIT" "$WEB_UNIT"; do
+for u in "$API_UNIT" "$WEB_UNIT" "$WORKER_UNIT"; do
   systemctl cat "$u" >/dev/null 2>&1 || die "$u not installed — run install.sh on the host first"
 done
+[[ -f "$SRC/apps/api/dist/worker.js" ]] || die "workspace has no worker build"
 [[ -d "$SRC/apps/api/dist" && -d "$SRC/apps/web/.next" ]] || die "workspace is not built"
 [[ ! -e $TARGET ]] || die "release $RELEASE_ID already exists"
 
@@ -55,12 +56,16 @@ rsync -a --delete   --exclude='/apps/web/.next/cache/***' --exclude='/node_modul
 printf '%s\n' "$RELEASE_ID" >"$TARGET/RELEASE"
 chmod -R go-w "$TARGET"
 
+# The worker has no HTTP port: "healthy" means systemd still has it running after a few seconds.
+worker_running() { sleep 5; sudo /usr/bin/systemctl is-active "$WORKER_UNIT" >/dev/null; }
+
 PREVIOUS=$(readlink -f "$CURRENT" 2>/dev/null || true)
 
 activate() {
   ln -sfn "$1" "$CURRENT.next" && mv -T "$CURRENT.next" "$CURRENT"   # atomic switch
   sudo /usr/bin/systemctl restart "$API_UNIT"
   sudo /usr/bin/systemctl restart "$WEB_UNIT"
+  sudo /usr/bin/systemctl restart "$WORKER_UNIT"
 }
 
 log "activating"
@@ -68,7 +73,8 @@ activate "$TARGET"
 
 log "health check"
 if wait_for "http://127.0.0.1:${API_PORT}/api/health/ready" "\"release\":\"${RELEASE_ID}\"" 30 \
-  && wait_for "http://127.0.0.1:${WEB_PORT}/sign-in" "" 30; then
+  && wait_for "http://127.0.0.1:${WEB_PORT}/sign-in" "" 30 \
+  && worker_running; then
   log "healthy: $RELEASE_ID"
 else
   log "health check FAILED for $RELEASE_ID"

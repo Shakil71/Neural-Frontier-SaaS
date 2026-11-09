@@ -274,6 +274,355 @@
           "health"
         ]
       }
+    },
+    "/api/v1/connectors": {
+      "get": {
+        "operationId": "ConnectorsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      },
+      "post": {
+        "operationId": "ConnectorsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/connectors/{id}": {
+      "get": {
+        "operationId": "ConnectorsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      },
+      "patch": {
+        "operationId": "ConnectorsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      },
+      "delete": {
+        "operationId": "ConnectorsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/connectors/{id}/test": {
+      "post": {
+        "operationId": "ConnectorsController_test",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/connectors/{id}/sync": {
+      "post": {
+        "operationId": "ConnectorsController_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/connectors/{id}/runs": {
+      "get": {
+        "operationId": "ConnectorsController_runs",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "connectors"
+        ]
+      }
+    },
+    "/api/v1/directory/users": {
+      "get": {
+        "operationId": "DirectoryController_users",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "directory"
+        ]
+      }
+    },
+    "/api/v1/directory/groups": {
+      "get": {
+        "operationId": "DirectoryController_groups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "directory"
+        ]
+      }
+    },
+    "/api/v1/directory/groups/{id}/members": {
+      "get": {
+        "operationId": "DirectoryController_members",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "directory"
+        ]
+      }
+    },
+    "/api/v1/service-principals": {
+      "get": {
+        "operationId": "ServicePrincipalsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      },
+      "post": {
+        "operationId": "ServicePrincipalsController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      }
+    },
+    "/api/v1/service-principals/{id}": {
+      "get": {
+        "operationId": "ServicePrincipalsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      },
+      "patch": {
+        "operationId": "ServicePrincipalsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      }
+    },
+    "/api/v1/service-principals/{id}/secrets": {
+      "post": {
+        "operationId": "ServicePrincipalsController_createSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      }
+    },
+    "/api/v1/service-principals/{id}/secrets/{secretId}": {
+      "delete": {
+        "operationId": "ServicePrincipalsController_revokeSecret",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "secretId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      }
+    },
+    "/api/v1/oauth/token": {
+      "post": {
+        "operationId": "OAuthController_token",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "service-principals"
+        ]
+      }
     }
   },
   "info": {

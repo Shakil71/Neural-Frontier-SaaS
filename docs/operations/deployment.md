@@ -98,6 +98,45 @@ sudo -u neural /license_monitoring/neural-frontier/current/deploy/oracle-linux/s
 
 Migrations are expand-only, so older releases run on the newer schema.
 
+## Background worker and directory connectors (Phase 2)
+
+The worker (`neural-frontier-worker.service`, `dist/worker.js`) runs directory syncs from the MySQL
+job queue (ADR 0008). It uses the same `/etc/neural-frontier/api.env`, so it needs the same settings
+as the API plus `NF_DATA_KEY`. That key encrypts connector credentials. `install.sh` generates it
+once into `secrets.env` and copies it to `api.env`.
+
+**Keep a copy of `NF_DATA_KEY` with `backup.key`, off the server.** Without it, connector secrets
+can't be decrypted. Nothing else is lost: re-enter each connector's client secret.
+
+Upgrading a host installed before Phase 2 (one time, as root, from the new release):
+
+```bash
+sudo /license_monitoring/neural-frontier/current/deploy/oracle-linux/scripts/install.sh \
+  --public-url https://192.168.197.100:8643
+```
+
+It is idempotent. It adds `NF_DATA_KEY`, installs and enables the worker unit, and extends the
+deploy sudoers rule. Run it **before** deploying the Phase 2 release, because `deploy.sh` refuses
+to run without the worker unit.
+
+Connecting Microsoft Entra ID (Admin Center → Connectors → Connect directory):
+
+1. Entra admin center → App registrations → New registration (single tenant).
+2. API permissions → Microsoft Graph → **Application**: `User.Read.All`, `GroupMember.Read.All`
+   → Grant admin consent.
+3. Certificates & secrets → New client secret.
+4. Enter the directory (tenant) ID, application (client) ID and secret value. Then use **Test
+   connection**, then **Sync now**.
+
+The host needs outbound HTTPS to `login.microsoftonline.com` and `graph.microsoft.com`. The System
+page's **Background worker** card warns when jobs wait more than five minutes, which means the
+worker isn't running: `journalctl -u neural-frontier-worker`.
+
+Service principals (Admin Center → Service principals, Owners only) get tokens from
+`POST /api/v1/oauth/token` (client credentials, form or Basic auth). Tokens are valid for 15
+minutes and can only call routes opened to machines (directory, connectors read/sync, audit and
+identity reads).
+
 ## Backups
 
 ```bash

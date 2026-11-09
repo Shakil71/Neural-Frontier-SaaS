@@ -53,6 +53,15 @@ model Tenant {
   auditEvents     AuditEvent[]
   idempotencyKeys IdempotencyKey[]
 
+  connectors              Connector[]
+  syncRuns                SyncRun[]
+  directoryUsers          DirectoryUser[]
+  directoryGroups         DirectoryGroup[]
+  directoryMemberships    DirectoryMembership[]
+  jobs                    Job[]
+  servicePrincipals       ServicePrincipal[]
+  servicePrincipalSecrets ServicePrincipalSecret[]
+
   @@map("tenants")
 }
 
@@ -205,4 +214,240 @@ model IdempotencyKey {
   @@unique([tenantId, key])
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+// ───────────── Phase 2: connectors, directory, job queue, machine identity ─────────────
+
+enum ConnectorKind {
+  microsoft_graph
+}
+
+enum ConnectorStatus {
+  active
+  disabled
+}
+
+enum SyncRunStatus {
+  queued
+  running
+  succeeded
+  failed
+}
+
+/// A link to an external directory. Non-secret settings live in `config`; the credential is
+/// encrypted with AES-256-GCM under NF_DATA_KEY and is never returned by the API.
+model Connector {
+  id                  String          @id @default(uuid(7)) @db.Char(36)
+  tenantId            String          @db.Char(36)
+  kind                ConnectorKind
+  name                String          @db.VarChar(120)
+  status              ConnectorStatus @default(active)
+  config              Json
+  secretCiphertext    Bytes?          @db.VarBinary(2048)
+  secretHint          String?         @db.VarChar(16)
+  /// 0 = manual only.
+  syncIntervalMinutes Int             @default(60)
+  usersDeltaLink      String?         @db.Text
+  groupsDeltaLink     String?         @db.Text
+  lastSyncAt          DateTime?       @db.DateTime(3)
+  lastSyncStatus      SyncRunStatus?
+  createdById         String?         @db.Char(36)
+  createdAt           DateTime        @default(now()) @db.DateTime(3)
+  updatedAt           DateTime        @updatedAt @db.DateTime(3)
+  version             Int             @default(0)
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  runs        SyncRun[]
+  users       DirectoryUser[]
+  groups      DirectoryGroup[]
+  memberships DirectoryMembership[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@index([status, lastSyncAt])
+  @@map("connectors")
+}
+
+model SyncRun {
+  id                 String        @id @default(uuid(7)) @db.Char(36)
+  tenantId           String        @db.Char(36)
+  connectorId        String        @db.Char(36)
+  status             SyncRunStatus @default(queued)
+  /// manual | schedule
+  trigger            String        @db.VarChar(16)
+  /// full | delta (decided when the run starts)
+  mode               String?       @db.VarChar(16)
+  requestedById      String?       @db.Char(36)
+  attempts           Int           @default(0)
+  usersUpserted      Int           @default(0)
+  usersRemoved       Int           @default(0)
+  groupsUpserted     Int           @default(0)
+  groupsRemoved      Int           @default(0)
+  membershipsChanged Int           @default(0)
+  error              String?       @db.VarChar(1000)
+  startedAt          DateTime?     @db.DateTime(3)
+  finishedAt         DateTime?     @db.DateTime(3)
+  createdAt          DateTime      @default(now()) @db.DateTime(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  connector Connector @relation(fields: [tenantId, connectorId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, connectorId, createdAt])
+  @@map("sync_runs")
+}
+
+/// Read-only copy of a user in an external directory. Not an Identity: it cannot sign in.
+model DirectoryUser {
+  id                String    @id @default(uuid(7)) @db.Char(36)
+  tenantId          String    @db.Char(36)
+  connectorId       String    @db.Char(36)
+  externalId        String    @db.VarChar(64)
+  userPrincipalName String    @db.VarChar(320)
+  mail              String?   @db.VarChar(320)
+  displayName       String    @db.VarChar(256)
+  jobTitle          String?   @db.VarChar(128)
+  department        String?   @db.VarChar(128)
+  accountEnabled    Boolean   @default(true)
+  deletedAt         DateTime? @db.DateTime(3)
+  syncedAt          DateTime  @db.DateTime(3)
+  createdAt         DateTime  @default(now()) @db.DateTime(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  connector Connector @relation(fields: [tenantId, connectorId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, connectorId, externalId])
+  @@index([tenantId, displayName])
+  @@index([tenantId, connectorId, syncedAt])
+  @@map("directory_users")
+}
+
+model DirectoryGroup {
+  id              String    @id @default(uuid(7)) @db.Char(36)
+  tenantId        String    @db.Char(36)
+  connectorId     String    @db.Char(36)
+  externalId      String    @db.VarChar(64)
+  displayName     String    @db.VarChar(256)
+  description     String?   @db.VarChar(1024)
+  mail            String?   @db.VarChar(320)
+  securityEnabled Boolean   @default(false)
+  mailEnabled     Boolean   @default(false)
+  groupTypes      Json
+  deletedAt       DateTime? @db.DateTime(3)
+  syncedAt        DateTime  @db.DateTime(3)
+  createdAt       DateTime  @default(now()) @db.DateTime(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  connector Connector @relation(fields: [tenantId, connectorId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, connectorId, externalId])
+  @@index([tenantId, displayName])
+  @@index([tenantId, connectorId, syncedAt])
+  @@map("directory_groups")
+}
+
+/// Membership by external id, so a member may arrive before (or without) its user/group row.
+model DirectoryMembership {
+  id               String   @id @default(uuid(7)) @db.Char(36)
+  tenantId         String   @db.Char(36)
+  connectorId      String   @db.Char(36)
+  groupExternalId  String   @db.VarChar(64)
+  memberExternalId String   @db.VarChar(64)
+  /// user | group | other
+  memberType       String   @db.VarChar(16)
+  syncedAt         DateTime @db.DateTime(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  connector Connector @relation(fields: [tenantId, connectorId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, connectorId, groupExternalId, memberExternalId])
+  @@index([tenantId, connectorId, memberExternalId])
+  @@index([tenantId, connectorId, syncedAt])
+  @@map("directory_memberships")
+}
+
+enum JobStatus {
+  queued
+  running
+  succeeded
+  dead
+}
+
+/// Durable job queue (ADR 0008). Claimed with SELECT … FOR UPDATE SKIP LOCKED plus a lease;
+/// when a worker dies its lease expires and the job runs again. `activeKey` is unique while
+/// a job is queued or running (e.g. one sync per connector) and cleared when it finishes.
+model Job {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  tenantId    String    @db.Char(36)
+  type        String    @db.VarChar(64)
+  payload     Json
+  status      JobStatus @default(queued)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAt       DateTime  @db.DateTime(3)
+  lockedBy    String?   @db.VarChar(64)
+  lockedUntil DateTime? @db.DateTime(3)
+  lastError   String?   @db.VarChar(2000)
+  activeKey   String?   @unique @db.VarChar(128)
+  createdAt   DateTime  @default(now()) @db.DateTime(3)
+  updatedAt   DateTime  @updatedAt @db.DateTime(3)
+  finishedAt  DateTime? @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([status, runAt])
+  @@index([status, tenantId])
+  @@index([tenantId, createdAt])
+  @@map("jobs")
+}
+
+enum ServicePrincipalStatus {
+  active
+  disabled
+}
+
+/// Machine identity for connectors and automation (OAuth 2.0 client credentials).
+model ServicePrincipal {
+  id          String                 @id @default(uuid(7)) @db.Char(36)
+  tenantId    String                 @db.Char(36)
+  name        String                 @db.VarChar(120)
+  description String                 @db.VarChar(500)
+  clientId    String                 @unique @db.VarChar(64)
+  /// Subset of MACHINE_PERMISSIONS from @nf/contracts.
+  permissions Json
+  status      ServicePrincipalStatus @default(active)
+  createdById String?                @db.Char(36)
+  lastUsedAt  DateTime?              @db.DateTime(3)
+  createdAt   DateTime               @default(now()) @db.DateTime(3)
+  updatedAt   DateTime               @updatedAt @db.DateTime(3)
+  version     Int                    @default(0)
+
+  tenant  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  secrets ServicePrincipalSecret[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@map("service_principals")
+}
+
+/// Client secrets are 256-bit random values; only their SHA-256 is stored. Several may be
+/// valid at once, so a secret can be rotated without downtime.
+model ServicePrincipalSecret {
+  id                 String    @id @default(uuid(7)) @db.Char(36)
+  tenantId           String    @db.Char(36)
+  servicePrincipalId String    @db.Char(36)
+  secretHash         Bytes     @unique @db.Binary(32)
+  hint               String    @db.VarChar(8)
+  expiresAt          DateTime  @db.DateTime(3)
+  revokedAt          DateTime? @db.DateTime(3)
+  lastUsedAt         DateTime? @db.DateTime(3)
+  createdAt          DateTime  @default(now()) @db.DateTime(3)
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  servicePrincipal ServicePrincipal @relation(fields: [tenantId, servicePrincipalId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, servicePrincipalId])
+  @@map("service_principal_secrets")
 }

@@ -1,6 +1,14 @@
 import type { AuditAction } from "@nf/contracts";
 import {
+  Bot,
+  Cable,
+  CircleCheck,
+  CircleX,
   KeyRound,
+  KeySquare,
+  RefreshCw,
+  Trash2,
+  Unplug,
   LogIn,
   LogOut,
   type LucideIcon,
@@ -24,6 +32,34 @@ export const AUDIT_LABELS: Record<
   "role.assigned": { label: "Role granted", icon: ShieldPlus, tone: "primary" },
   "role.revoked": { label: "Role revoked", icon: ShieldMinus, tone: "warning" },
   "authz.denied": { label: "Access denied", icon: ShieldAlert, tone: "danger" },
+  "connector.created": { label: "Connector added", icon: Cable, tone: "primary" },
+  "connector.updated": { label: "Connector changed", icon: Cable, tone: "warning" },
+  "connector.deleted": { label: "Connector deleted", icon: Unplug, tone: "danger" },
+  "connector.sync_requested": { label: "Sync requested", icon: RefreshCw, tone: "neutral" },
+  "connector.sync_completed": { label: "Sync completed", icon: CircleCheck, tone: "neutral" },
+  "connector.sync_failed": { label: "Sync failed", icon: CircleX, tone: "danger" },
+  "service_principal.created": { label: "Service principal created", icon: Bot, tone: "primary" },
+  "service_principal.updated": { label: "Service principal changed", icon: Bot, tone: "warning" },
+  "service_principal.secret_created": {
+    label: "Client secret issued",
+    icon: KeySquare,
+    tone: "warning",
+  },
+  "service_principal.secret_revoked": {
+    label: "Client secret revoked",
+    icon: Trash2,
+    tone: "warning",
+  },
+  "service_principal.token_issued": {
+    label: "Access token issued",
+    icon: KeyRound,
+    tone: "neutral",
+  },
+  "service_principal.auth_failed": {
+    label: "Machine sign-in failed",
+    icon: ShieldAlert,
+    tone: "danger",
+  },
 };
 
 export function auditLabel(action: string) {

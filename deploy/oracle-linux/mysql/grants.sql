@@ -8,5 +8,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.roles            TO 'nf_
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.role_assignments TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.sessions         TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.idempotency_keys TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.connectors                TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.sync_runs                 TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.directory_users           TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.directory_groups          TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.directory_memberships     TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.jobs                      TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.service_principals        TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.service_principal_secrets TO 'nf_app'@'127.0.0.1';
 -- Append-only audit trail.
 GRANT SELECT, INSERT                 ON neural_frontier.audit_events     TO 'nf_app'@'127.0.0.1';

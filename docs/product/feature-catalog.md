@@ -12,34 +12,36 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 
 ## Platform foundation
 
-| Capability                                                      | Delivery     | Status         |
-| --------------------------------------------------------------- | ------------ | -------------- |
-| Multi-tenant data model with enforced isolation                 | Native       | ✅ Built       |
-| OIDC single sign-on (any compliant IdP), PKCE                   | Native       | ✅ Built       |
-| Server-side sessions, idle/absolute expiry, revocation          | Native       | ✅ Built       |
-| RBAC with built-in roles, separation of duties                  | Native       | ✅ Built       |
-| Append-only audit log (UI + API)                                | Native       | ✅ Built       |
-| Identity lifecycle: suspend / reactivate with reason            | Native       | ✅ Built       |
-| Role grant / revoke with idempotency and last-owner protection  | Native       | ✅ Built       |
-| Live identity & access dashboard                                | Native       | ✅ Built       |
-| Health, readiness, Prometheus metrics, structured logs          | Native       | ✅ Built       |
-| OpenAPI document                                                | Native       | ✅ Built       |
-| SAML 2.0 SSO, SCIM provisioning                                 | Native       | ⬜ Phase 2     |
-| Passkeys / WebAuthn, MFA policy enforcement                     | Native + IdP | ⬜ Phase 2     |
-| Custom roles, ABAC conditions, JIT elevation, access reviews    | Native       | ⬜ Phase 2–5   |
-| API keys / OAuth client credentials, webhooks, Developer Portal | Native       | ⬜ Phase 2 / 9 |
-| OpenTelemetry tracing export                                    | OSS (OTel)   | ⬜ Phase 3     |
-| Background jobs (BullMQ)                                        | OSS          | ⬜ Phase 2     |
+| Capability                                                     | Delivery     | Status        |
+| -------------------------------------------------------------- | ------------ | ------------- |
+| Multi-tenant data model with enforced isolation                | Native       | ✅ Built      |
+| OIDC single sign-on (any compliant IdP), PKCE                  | Native       | ✅ Built      |
+| Server-side sessions, idle/absolute expiry, revocation         | Native       | ✅ Built      |
+| RBAC with built-in roles, separation of duties                 | Native       | ✅ Built      |
+| Append-only audit log (UI + API)                               | Native       | ✅ Built      |
+| Identity lifecycle: suspend / reactivate with reason           | Native       | ✅ Built      |
+| Role grant / revoke with idempotency and last-owner protection | Native       | ✅ Built      |
+| Live identity & access dashboard                               | Native       | ✅ Built      |
+| Health, readiness, Prometheus metrics, structured logs         | Native       | ✅ Built      |
+| OpenAPI document                                               | Native       | ✅ Built      |
+| SAML 2.0 SSO, SCIM provisioning                                | Native       | ⬜ Phase 2    |
+| Passkeys / WebAuthn, MFA policy enforcement                    | Native + IdP | ⬜ Phase 2    |
+| Custom roles, ABAC conditions, JIT elevation, access reviews   | Native       | ⬜ Phase 2–5  |
+| OAuth client credentials (service principals)                  | Native       | ✅ Built (2a) |
+| Webhooks, Developer Portal                                     | Native       | ⬜ Phase 9    |
+| OpenTelemetry tracing export                                   | OSS (OTel)   | ⬜ Phase 3    |
+| Background jobs: retries, dead-letter, per-tenant fairness     | Native       | ✅ Built (2a) |
 
 ## Frontier Identity
 
-| Capability                                                           | Delivery                        | Status     |
-| -------------------------------------------------------------------- | ------------------------------- | ---------- |
-| Active Directory users, groups, OUs, computers (multi-domain/forest) | Native Windows connector (.NET) | ⬜ Phase 2 |
-| Microsoft Entra ID users/groups, hybrid sync visibility              | Graph                           | ⬜ Phase 2 |
-| Conditional Access policy visibility                                 | Graph                           | ⬜ Phase 2 |
-| Privileged identity governance, delegated administration             | Native                          | ⬜ Phase 5 |
-| Identity risk analytics                                              | Native + AI                     | ⬜ Phase 4 |
+| Capability                                                           | Delivery                        | Status        |
+| -------------------------------------------------------------------- | ------------------------------- | ------------- |
+| Active Directory users, groups, OUs, computers (multi-domain/forest) | Native Windows connector (.NET) | ⬜ Phase 2    |
+| Microsoft Entra ID users, groups, memberships (read-only delta sync) | Graph                           | ✅ Built (2a) |
+| Hybrid sync visibility                                               | Graph                           | ⬜ Phase 2    |
+| Conditional Access policy visibility                                 | Graph                           | ⬜ Phase 2    |
+| Privileged identity governance, delegated administration             | Native                          | ⬜ Phase 5    |
+| Identity risk analytics                                              | Native + AI                     | ⬜ Phase 4    |
 
 ## Infrastructure & security operations
 

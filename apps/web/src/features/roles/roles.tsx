@@ -24,6 +24,9 @@ const PERMISSION_GROUPS: { label: string; prefix: string }[] = [
   { label: "Roles", prefix: "roles." },
   { label: "Audit", prefix: "audit." },
   { label: "Platform", prefix: "system." },
+  { label: "Directory", prefix: "directory." },
+  { label: "Connectors", prefix: "connectors." },
+  { label: "Machine identity", prefix: "service_principals." },
 ];
 
 export function Roles() {

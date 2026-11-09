@@ -59,12 +59,15 @@ EOF
   )
   chmod 0600 "$SECRETS"
 fi
+# Added in Phase 2 (connector credential encryption); appended once for existing installs.
+grep -q '^NF_DATA_KEY=' "$SECRETS" || printf 'NF_DATA_KEY=%s\n' "$(openssl rand -base64 32)" >>"$SECRETS"
 [[ -f "$CONF_DIR/backup.key" ]] || { (umask 077; openssl rand -base64 64 >"$CONF_DIR/backup.key"); }
 chmod 0600 "$CONF_DIR/backup.key"
 APP_PW=$(env_get "$SECRETS" NF_APP_DB_PASSWORD)
 MIGRATE_PW=$(env_get "$SECRETS" NF_MIGRATE_DB_PASSWORD)
 REDIS_PW=$(env_get "$SECRETS" NF_REDIS_PASSWORD)
 SESSION_SECRET=$(env_get "$SECRETS" NF_SESSION_SECRET)
+DATA_KEY=$(env_get "$SECRETS" NF_DATA_KEY)
 
 log "MySQL database and users"
 sed -e "s/__NF_APP_PASSWORD__/${APP_PW}/g" -e "s/__NF_MIGRATE_PASSWORD__/${MIGRATE_PW}/g" \
@@ -90,6 +93,11 @@ if [[ ! -f "$CONF_DIR/api.env" ]]; then
       -e "s|^NF_SESSION_SECRET=.*|NF_SESSION_SECRET=${SESSION_SECRET}|" \
       -e "s|^NF_PUBLIC_URL=.*|NF_PUBLIC_URL=${PUBLIC_URL}|" \
       "$KIT/env/api.env.example" >"$CONF_DIR/api.env"
+fi
+# Keys added after the first install are appended, never overwritten.
+if ! grep -q '^NF_DATA_KEY=.' "$CONF_DIR/api.env"; then
+  sed -i '/^NF_DATA_KEY=/d' "$CONF_DIR/api.env"
+  printf 'NF_DATA_KEY=%s\n' "$DATA_KEY" >>"$CONF_DIR/api.env"
 fi
 [[ -f "$CONF_DIR/web.env" ]] || cp "$KIT/env/web.env.example" "$CONF_DIR/web.env"
 printf 'DATABASE_URL=mysql://nf_migrate:%s@127.0.0.1:3306/%s?allowPublicKeyRetrieval=true\nNF_MIGRATE_DB_PASSWORD=%s\n' \
@@ -122,9 +130,9 @@ log "root-owned operations scripts"
 install -o root -g root -m 0755 "$HERE/lib.sh" "$HERE/backup.sh" "$HERE/restore-test.sh" "$HERE/validate.sh" "$ROOT_LIB/"
 
 log "systemd units"
-install -o root -g root -m 0644 "$KIT"/systemd/neural-frontier-{api,web,backup}.service "$KIT/systemd/neural-frontier-backup.timer" /etc/systemd/system/
+install -o root -g root -m 0644 "$KIT"/systemd/neural-frontier-{api,web,worker,backup}.service "$KIT/systemd/neural-frontier-backup.timer" /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable "$API_UNIT" "$WEB_UNIT" >/dev/null 2>&1
+systemctl enable "$API_UNIT" "$WEB_UNIT" "$WORKER_UNIT" >/dev/null 2>&1
 systemctl enable --now neural-frontier-backup.timer >/dev/null 2>&1
 
 log "deploy sudoers rule"
@@ -132,8 +140,10 @@ cat >/etc/sudoers.d/neural-frontier-deploy <<EOF
 # Neural Frontier deploy: the runner (user ${APP_USER}) may only restart/inspect its own units.
 Cmnd_Alias NF_UNITS = /usr/bin/systemctl restart ${API_UNIT}, \\
                       /usr/bin/systemctl restart ${WEB_UNIT}, \\
+                      /usr/bin/systemctl restart ${WORKER_UNIT}, \\
                       /usr/bin/systemctl is-active ${API_UNIT}, \\
-                      /usr/bin/systemctl is-active ${WEB_UNIT}
+                      /usr/bin/systemctl is-active ${WEB_UNIT}, \\
+                      /usr/bin/systemctl is-active ${WORKER_UNIT}
 ${APP_USER} ALL=(root) NOPASSWD: NF_UNITS
 EOF
 chmod 0440 /etc/sudoers.d/neural-frontier-deploy

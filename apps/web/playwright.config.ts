@@ -21,6 +21,8 @@ const apiEnv = {
   NF_OIDC_CLIENT_SECRET: "dev-secret-not-for-production",
   NF_OIDC_ALLOW_INSECURE_HTTP: "true",
   NF_RELEASE: "e2e",
+  // Fixed test-only key (32 zero-ish bytes); production generates its own in install.sh.
+  NF_DATA_KEY: "ZTJlLWRhdGEta2V5LWZvci10ZXN0cy1vbmx5LTAwMDE=",
   LOG_LEVEL: "warn",
 };
 

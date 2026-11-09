@@ -26,6 +26,7 @@ log "switching $CURRENT_ID -> $TARGET_ID"
 ln -sfn "$RELEASES/$TARGET_ID" "$CURRENT.next" && mv -T "$CURRENT.next" "$CURRENT"
 sudo /usr/bin/systemctl restart "$API_UNIT"
 sudo /usr/bin/systemctl restart "$WEB_UNIT"
+sudo /usr/bin/systemctl restart "$WORKER_UNIT"
 
 if wait_for "http://127.0.0.1:${API_PORT}/api/health/ready" "\"release\":\"${TARGET_ID}\"" 30 \
   && wait_for "http://127.0.0.1:${WEB_PORT}/sign-in" "" 30; then

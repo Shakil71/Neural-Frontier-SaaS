@@ -16,6 +16,14 @@ export const TENANT_SCOPED_MODELS = new Set([
   "Session",
   "AuditEvent",
   "IdempotencyKey",
+  "Connector",
+  "SyncRun",
+  "DirectoryUser",
+  "DirectoryGroup",
+  "DirectoryMembership",
+  "Job",
+  "ServicePrincipal",
+  "ServicePrincipalSecret",
 ]);
 
 const READ_OR_FILTERED_WRITE = new Set([

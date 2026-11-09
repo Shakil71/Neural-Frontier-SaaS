@@ -11,6 +11,7 @@ const prod = {
   NODE_ENV: "production",
   NF_PUBLIC_URL: "https://nf.example.com",
   REDIS_URL: "redis://nf:pw@127.0.0.1:6379/0",
+  NF_DATA_KEY: Buffer.alloc(32, 7).toString("base64"),
 };
 
 describe("loadConfig", () => {
@@ -41,6 +42,8 @@ describe("loadConfig", () => {
     [{ NF_OIDC_ALLOW_INSECURE_HTTP: "true" }, /NF_OIDC_ALLOW_INSECURE_HTTP/],
     [{ REDIS_URL: undefined }, /REDIS_URL/],
     [{ NF_PUBLIC_URL: "http://nf.example.com" }, /NF_PUBLIC_URL/],
+    [{ NF_DATA_KEY: undefined }, /NF_DATA_KEY/],
+    [{ NF_DATA_KEY: Buffer.alloc(16).toString("base64") }, /32 bytes/],
   ])("refuses insecure production setting %o", (override, message) => {
     expect(() => loadConfig({ ...prod, ...override })).toThrow(message);
   });

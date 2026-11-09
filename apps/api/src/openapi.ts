@@ -13,6 +13,7 @@ const config = loadConfig({
   NF_PUBLIC_URL: "http://localhost:3400",
   NF_SESSION_SECRET: "openapi-generation-only-not-a-real-secret",
   LOG_LEVEL: "error",
+  NF_ROLE_SYNC_ON_START: "false",
 });
 const app = await createApp(config, { bufferLogs: false });
 await app.init();

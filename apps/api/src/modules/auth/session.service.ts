@@ -68,6 +68,7 @@ export class SessionService {
     }
 
     return {
+      kind: "user",
       sessionId: session.id,
       identityId: session.identityId,
       tenantId: session.tenantId,

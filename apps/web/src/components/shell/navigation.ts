@@ -1,7 +1,10 @@
 import type { Permission } from "@nf/contracts";
 import {
   Activity,
+  BookUser,
+  Bot,
   Building2,
+  Cable,
   LayoutDashboard,
   type LucideIcon,
   ScrollText,
@@ -52,6 +55,25 @@ export const NAV: { group: string; items: NavItem[] }[] = [
     ],
   },
   {
+    group: "Directory",
+    items: [
+      {
+        href: "/directory",
+        label: "Directory",
+        icon: BookUser,
+        permission: "directory.read",
+        keywords: "entra azure ad users groups members synced",
+      },
+      {
+        href: "/connectors",
+        label: "Connectors",
+        icon: Cable,
+        permission: "connectors.read",
+        keywords: "microsoft graph entra sync integration",
+      },
+    ],
+  },
+  {
     group: "Governance",
     items: [
       {
@@ -72,6 +94,13 @@ export const NAV: { group: string; items: NavItem[] }[] = [
         icon: Activity,
         permission: "system.health.read",
         keywords: "status uptime",
+      },
+      {
+        href: "/service-principals",
+        label: "Service principals",
+        icon: Bot,
+        permission: "service_principals.read",
+        keywords: "machine identity api client credentials automation tokens",
       },
       {
         href: "/settings",

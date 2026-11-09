@@ -1,7 +1,13 @@
 import type { Permission } from "@nf/contracts";
 
-/** The authenticated caller, resolved per request from the session cookie. */
+/**
+ * The authenticated caller, resolved per request.
+ * - `user`: a person, from the session cookie (sessionId = session row id).
+ * - `service`: a service principal, from an OAuth bearer token (sessionId = token id,
+ *   identityId = service principal id, email = "service:<name>" for audit labels).
+ */
 export interface Principal {
+  kind: "user" | "service";
   sessionId: string;
   identityId: string;
   tenantId: string;

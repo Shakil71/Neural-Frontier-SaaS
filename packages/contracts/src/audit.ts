@@ -11,6 +11,18 @@ export const AUDIT_ACTIONS = [
   "role.assigned",
   "role.revoked",
   "authz.denied",
+  "connector.created",
+  "connector.updated",
+  "connector.deleted",
+  "connector.sync_requested",
+  "connector.sync_completed",
+  "connector.sync_failed",
+  "service_principal.created",
+  "service_principal.updated",
+  "service_principal.secret_created",
+  "service_principal.secret_revoked",
+  "service_principal.token_issued",
+  "service_principal.auth_failed",
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

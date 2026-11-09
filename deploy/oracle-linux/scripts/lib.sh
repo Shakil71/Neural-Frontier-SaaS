@@ -13,6 +13,7 @@ ROOT_LIB="/usr/local/lib/neural-frontier"
 DB_NAME="neural_frontier"
 API_UNIT="neural-frontier-api.service"
 WEB_UNIT="neural-frontier-web.service"
+WORKER_UNIT="neural-frontier-worker.service"
 API_PORT=3401
 WEB_PORT=3400
 HTTPS_PORT=8643

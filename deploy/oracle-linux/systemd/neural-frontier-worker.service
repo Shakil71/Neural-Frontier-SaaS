@@ -1,0 +1,43 @@
+[Unit]
+Description=Neural Frontier background worker (job queue: directory sync)
+Documentation=https://github.com/Shakil71/Neural-Frontier-SaaS/blob/main/docs/operations/deployment.md
+After=network-online.target mysqld.service neural-frontier-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=neural
+Group=neural
+WorkingDirectory=/license_monitoring/neural-frontier/current/apps/api
+EnvironmentFile=/etc/neural-frontier/api.env
+ExecStart=/usr/bin/node --enable-source-maps dist/worker.js
+Restart=on-failure
+RestartSec=5
+# Running jobs are handed back to the queue on SIGTERM.
+TimeoutStopSec=30
+KillSignal=SIGTERM
+# Hardening — mirrors the existing services on this host.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+ReadOnlyPaths=/license_monitoring/neural-frontier
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

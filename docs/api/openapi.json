@@ -48,7 +48,7 @@
         "operationId": "AuthController_logout",
         "parameters": [],
         "responses": {
-          "204": {
+          "200": {
             "description": ""
           }
         },
@@ -673,6 +673,55 @@
         },
         "tags": [
           "service-principals"
+        ]
+      }
+    },
+    "/api/v1/tenant/scim-tokens": {
+      "get": {
+        "operationId": "ScimTokensController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "scim"
+        ]
+      },
+      "post": {
+        "operationId": "ScimTokensController_create",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "scim"
+        ]
+      }
+    },
+    "/api/v1/tenant/scim-tokens/{id}": {
+      "delete": {
+        "operationId": "ScimTokensController_revoke",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "scim"
         ]
       }
     }

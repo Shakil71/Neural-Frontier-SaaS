@@ -25,7 +25,8 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 | Live identity & access dashboard                               | Native       | ✅ Built      |
 | Health, readiness, Prometheus metrics, structured logs         | Native       | ✅ Built      |
 | OpenAPI document                                               | Native       | ✅ Built      |
-| SAML 2.0 SSO, SCIM provisioning                                | Native       | ⬜ Phase 2    |
+| SCIM 2.0 user provisioning (Entra ID, Okta)                    | Native       | ✅ Built (2c) |
+| SAML 2.0 SSO, SCIM groups                                      | Native       | ⬜ Phase 2    |
 | Passkeys / WebAuthn, MFA policy enforcement                    | Native + IdP | ⬜ Phase 2    |
 | Custom roles, ABAC conditions, JIT elevation, access reviews   | Native       | ⬜ Phase 2–5  |
 | OAuth client credentials (service principals)                  | Native       | ✅ Built (2a) |

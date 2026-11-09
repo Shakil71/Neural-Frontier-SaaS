@@ -35,6 +35,7 @@ const provider = new Provider(issuer, {
       client_id: process.env.DEV_IDP_CLIENT_ID ?? "neural-frontier-dev",
       client_secret: process.env.DEV_IDP_CLIENT_SECRET ?? "dev-secret-not-for-production",
       redirect_uris: [`${webOrigin}/api/v1/auth/callback`],
+      post_logout_redirect_uris: [`${webOrigin}/sign-in`],
       grant_types: ["authorization_code"],
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_post",

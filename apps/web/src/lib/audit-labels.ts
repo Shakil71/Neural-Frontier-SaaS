@@ -72,6 +72,8 @@ export const AUDIT_LABELS: Record<
     icon: Fingerprint,
     tone: "warning",
   },
+  "scim.token_created": { label: "Provisioning token issued", icon: KeySquare, tone: "warning" },
+  "scim.token_revoked": { label: "Provisioning token revoked", icon: Trash2, tone: "warning" },
 };
 
 export function auditLabel(action: string) {

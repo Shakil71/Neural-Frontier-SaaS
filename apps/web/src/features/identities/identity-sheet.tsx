@@ -354,6 +354,7 @@ export function IdentitySheet({
                     </Badge>
                   )}
                   <Badge tone="accent">SSO</Badge>
+                  {i.source === "scim" && <Badge tone="primary">Managed by SCIM</Badge>}
                   {isSelf && <Badge>You</Badge>}
                 </div>
               </div>

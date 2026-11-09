@@ -1,6 +1,6 @@
 "use client";
 
-import { type Permission, SessionSchema, type Session } from "@nf/contracts";
+import { LogoutResponseSchema, type Permission, SessionSchema, type Session } from "@nf/contracts";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { api, setCsrfToken } from "./api";
@@ -30,10 +30,16 @@ export function usePermissions() {
 export function useSignOut() {
   const client = useQueryClient();
   return async () => {
-    await api("/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+    const res = await api("/api/v1/auth/logout", {
+      method: "POST",
+      schema: LogoutResponseSchema,
+    }).catch(() => null);
     setCsrfToken(null);
     client.clear();
-    // Full reload on purpose: drops every piece of in-memory state from the old session.
-    window.location.replace(new URL("/sign-in?signedOut=1", window.location.origin).href);
+    // Full reload on purpose: drops every piece of in-memory state from the old session. When the
+    // identity provider supports it, go there first so its session ends too (single sign-out);
+    // it sends the browser back to /sign-in.
+    const next = res?.redirectTo && /^https?:\/\//.test(res.redirectTo) ? res.redirectTo : null;
+    window.location.replace(next ?? new URL("/sign-in?signedOut=1", window.location.origin).href);
   };
 }

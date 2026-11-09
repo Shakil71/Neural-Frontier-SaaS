@@ -25,7 +25,11 @@ export async function createApp(config: AppConfig, opts: { bufferLogs?: boolean 
     }),
   );
   app.use(cookieParser());
-  app.useBodyParser("json", { limit: "256kb" });
+  // SCIM clients send application/scim+json.
+  app.useBodyParser("json", {
+    limit: "256kb",
+    type: ["application/json", "application/scim+json"],
+  });
   // The OAuth token endpoint accepts form-encoded requests (RFC 6749).
   app.useBodyParser("urlencoded", { limit: "16kb", extended: false });
   app.setGlobalPrefix("api");

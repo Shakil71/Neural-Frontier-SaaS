@@ -94,7 +94,10 @@ export class AuthController {
     const result = await this.provisioning.signIn(completed.claims, meta, completed.context);
     if (!result.ok) return res.redirect(303, this.web(`/sign-in?error=${result.reason}`));
 
-    const { token } = await this.sessions.create(result.tenantId, result.identityId, meta);
+    const { token } = await this.sessions.create(result.tenantId, result.identityId, meta, {
+      provider: state.provider,
+      idToken: completed.idToken,
+    });
     res.cookie(this.config.cookie.sessionName, token, this.cookie(this.config.session.absoluteMs));
     return res.redirect(303, this.web(state.returnTo));
   }
@@ -114,14 +117,15 @@ export class AuthController {
     };
   }
 
+  /** Ends the session; `redirectTo` (when set) ends the identity provider's session too. */
   @Post("logout")
-  @HttpCode(204)
+  @HttpCode(200)
   async logout(
     @CurrentPrincipal() p: Principal,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.sessions.revoke(p.tenantId, p.sessionId);
+    const ended = await this.sessions.end(p.tenantId, p.sessionId);
     await this.audit.record({
       tenantId: p.tenantId,
       action: "auth.sign_out",
@@ -130,5 +134,6 @@ export class AuthController {
       meta: requestMeta(req),
     });
     res.clearCookie(this.config.cookie.sessionName, { path: "/" });
+    return { redirectTo: await this.oidc.endSessionUrl(ended.provider, ended.idToken) };
   }
 }

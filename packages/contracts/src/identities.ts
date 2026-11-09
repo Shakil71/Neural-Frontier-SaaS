@@ -9,7 +9,8 @@ export const IdentitySchema = z.object({
   email: z.email(),
   displayName: z.string(),
   status: IdentityStatusSchema,
-  source: z.enum(["oidc"]),
+  /** How the identity was created: first SSO sign-in, or pushed by a SCIM client. */
+  source: z.enum(["oidc", "scim"]),
   lastSignInAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   roles: z.array(z.object({ id: IdSchema, key: z.string(), name: z.string() })),

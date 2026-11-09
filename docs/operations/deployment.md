@@ -137,6 +137,24 @@ Service principals (Admin Center → Service principals, Owners only) get tokens
 minutes and can only call routes opened to machines (directory, connectors read/sync, audit and
 identity reads).
 
+## Automatic provisioning (SCIM 2.0) and single sign-out (Phase 2c)
+
+In the Admin Center, go to Organisation → Automatic provisioning → **New provisioning token**
+(Owners only). Copy the **Tenant URL** (`https://<host>:8643/api/scim/v2`) and the **secret
+token**; the token is shown once. In Entra ID:
+
+1. Enterprise application → Provisioning → Automatic.
+2. Paste both values, then use **Test connection**.
+3. Map **users only**. Groups aren't supported yet.
+
+`userName` must be a work email on a verified domain. New users get the Member role.
+Deactivating a user in Entra ID suspends them here and ends their sessions immediately.
+Deleting a user deactivates them; nobody is erased.
+
+Signing out now also ends the identity provider's session, using RP-initiated logout with
+`id_token_hint`. The provider must allow `https://<host>:8643/sign-in` as a post-logout
+redirect URI. `install-keycloak.sh` already registers it for Keycloak.
+
 ## Backups
 
 ```bash

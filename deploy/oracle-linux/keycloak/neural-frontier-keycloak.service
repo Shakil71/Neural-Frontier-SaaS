@@ -1,0 +1,33 @@
+[Unit]
+Description=Neural Frontier identity provider (Keycloak)
+After=network-online.target mysqld.service
+Wants=network-online.target
+Before=neural-frontier-api.service
+
+[Service]
+Type=exec
+User=keycloak
+Group=keycloak
+EnvironmentFile=/etc/keycloak/keycloak.env
+ExecStart=/opt/keycloak/bin/kc.sh start --optimized
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=180
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+ReadWritePaths=/opt/keycloak/data
+LimitNOFILE=65536
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

@@ -50,7 +50,7 @@ jobs:
             echo "::error::docs/api/openapi.json is out of date. Run 'npm run openapi' and commit it."; exit 1; }
       - name: Shell scripts (shellcheck)
         run: |
-          out=$(shellcheck -x -f json1 deploy/oracle-linux/scripts/*.sh) && status=0 || status=$?
+          out=$(shellcheck -x -f json1 deploy/oracle-linux/scripts/*.sh deploy/oracle-linux/keycloak/*.sh) && status=0 || status=$?
           echo "$out" | jq -r '.comments[] | "::error file=\(.file),line=\(.line)::SC\(.code) \(.message)"'
           exit $status
 

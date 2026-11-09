@@ -160,6 +160,9 @@ set_env NODE_EXTRA_CA_CERTS /etc/pki/tls/neural-frontier/selfsigned.crt
 systemctl restart "$API_UNIT"
 wait_for "http://127.0.0.1:${API_PORT}/api/health/ready" "" 30 || die "API did not restart cleanly"
 
+log "login theme"
+bash "$HERE/install-theme.sh" "$REALM" master
+
 log "done. Issuer: $ISSUER"
 log "Keycloak admin console (private networks only): ${PUBLIC_URL}/auth/admin/  user 'admin', password in $SECRETS"
 if [[ -n $TEMP_PW ]]; then

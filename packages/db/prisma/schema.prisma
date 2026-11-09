@@ -62,6 +62,7 @@ model Tenant {
   servicePrincipals       ServicePrincipal[]
   servicePrincipalSecrets ServicePrincipalSecret[]
   identityProvider        TenantIdentityProvider?
+  scimTokens              ScimToken[]
 
   @@map("tenants")
 }
@@ -89,6 +90,10 @@ model Identity {
   /// OIDC issuer + subject are bound on first sign-in; later sign-ins match on them, not on email.
   oidcIssuer   String?        @db.VarChar(512)
   oidcSubject  String?        @db.VarChar(255)
+  /// SCIM `externalId` from the provisioning client (e.g. the Entra object id).
+  scimExternalId String?      @db.VarChar(255)
+  /// True once a SCIM client created or claimed this identity: its lifecycle is driven from there.
+  scimManaged    Boolean      @default(false)
   lastSignInAt DateTime?      @db.DateTime(3)
   createdAt    DateTime       @default(now()) @db.DateTime(3)
   updatedAt    DateTime       @updatedAt @db.DateTime(3)
@@ -102,6 +107,7 @@ model Identity {
   @@unique([tenantId, id])
   @@unique([tenantId, email])
   @@unique([oidcIssuer, oidcSubject])
+  @@unique([tenantId, scimExternalId])
   @@index([tenantId, status])
   @@index([tenantId, displayName])
   @@map("identities")
@@ -162,6 +168,10 @@ model Session {
   idleExpiresAt DateTime  @db.DateTime(3)
   expiresAt     DateTime  @db.DateTime(3)
   revokedAt     DateTime? @db.DateTime(3)
+  /// Provider the session signed in through ("global" | "tenant:<id>"), for single sign-out.
+  authProvider  String?   @db.VarChar(80)
+  /// The ID token, sealed with NF_DATA_KEY, sent back as id_token_hint on sign-out.
+  idTokenSealed Bytes?    @db.VarBinary(8192)
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   identity Identity @relation(fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
@@ -479,4 +489,26 @@ model TenantIdentityProvider {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   @@map("tenant_identity_providers")
+}
+
+// ───────────── Phase 2c: SCIM 2.0 provisioning ─────────────
+
+/// Bearer token a provisioning client (Entra ID, Okta) uses for /api/scim/v2. 256-bit random;
+/// only its SHA-256 is stored. Scoped to one tenant.
+model ScimToken {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  tenantId    String    @db.Char(36)
+  name        String    @db.VarChar(120)
+  tokenHash   Bytes     @unique @db.Binary(32)
+  hint        String    @db.VarChar(8)
+  expiresAt   DateTime  @db.DateTime(3)
+  revokedAt   DateTime? @db.DateTime(3)
+  lastUsedAt  DateTime? @db.DateTime(3)
+  createdById String?   @db.Char(36)
+  createdAt   DateTime  @default(now()) @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("scim_tokens")
 }

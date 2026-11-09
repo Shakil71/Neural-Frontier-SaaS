@@ -33,6 +33,13 @@ import { RolesController } from "./modules/roles/roles.controller.js";
 import { RolesService } from "./modules/roles/roles.service.js";
 import { TenantController } from "./modules/tenant/tenant.controller.js";
 import { IdentityProviderService } from "./modules/tenant/identity-provider.service.js";
+import { ScimController } from "./modules/scim/scim.controller.js";
+import {
+  ScimAuthGuard,
+  ScimTokensController,
+  ScimTokensService,
+} from "./modules/scim/scim-tokens.js";
+import { ScimUsersService } from "./modules/scim/scim-users.service.js";
 import { RoleCatalogSync } from "./modules/authz/role-catalog-sync.js";
 import { BearerResolver } from "./modules/auth/security.guard.js";
 import { ConnectorsController } from "./modules/connectors/connectors.controller.js";
@@ -108,6 +115,8 @@ export class AppModule implements NestModule {
         DirectoryController,
         ServicePrincipalsController,
         OAuthController,
+        ScimTokensController,
+        ScimController,
       ],
       providers: [
         AuditService,
@@ -126,6 +135,9 @@ export class AppModule implements NestModule {
         { provide: BearerResolver, useExisting: ServicePrincipalsService },
         RoleCatalogSync,
         IdentityProviderService,
+        ScimTokensService,
+        ScimUsersService,
+        ScimAuthGuard,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

@@ -159,6 +159,23 @@ async function idpLogin(page: Page, email: string) {
   await page.locator('button[type="submit"]').click();
 }
 
+test("signing out also ends the identity provider session (single sign-out)", async ({ page }) => {
+  await signInAs(page, "ada.owner@acme.example");
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+
+  // The provider asks to confirm (dev IdP behaviour), then returns to our sign-in page.
+  await expect(page).toHaveURL(/localhost:3499\//);
+  await page.getByRole("button", { name: "Yes, sign me out" }).click();
+  await expect(page).toHaveURL(/localhost:3400\/sign-in\?.*state=signed-out/);
+  await expect(page.getByText("You've been signed out.")).toBeVisible();
+
+  // The provider session is gone: signing in asks for credentials again.
+  await page.getByLabel("Work email").fill("ada.owner@acme.example");
+  await page.getByRole("button", { name: /Continue with single sign-on/ }).click();
+  await expect(page.locator('input[name="login"]')).toBeVisible();
+});
+
 // Runs last: it changes how the Acme tenant signs in.
 test("an organisation brings its own sign-in provider and can require it", async ({ page }) => {
   await signInAs(page, "ada.owner@acme.example");

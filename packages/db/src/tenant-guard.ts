@@ -25,6 +25,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "ServicePrincipal",
   "ServicePrincipalSecret",
   "TenantIdentityProvider",
+  "ScimToken",
 ]);
 
 const READ_OR_FILTERED_WRITE = new Set([

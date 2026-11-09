@@ -44,7 +44,9 @@ describe("authentication", () => {
 
   it("ends the session on logout", async () => {
     const owner = await signIn(t, acme.tenantId, acme.owner);
-    await owner.post("/api/v1/auth/logout").expect(204);
+    const out = await owner.post("/api/v1/auth/logout").expect(200);
+    // No IdP session to end for a session created without SSO.
+    expect(out.body).toEqual({ redirectTo: null });
     await owner.get("/api/v1/auth/session").expect(401);
   });
 });

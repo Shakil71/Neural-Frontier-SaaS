@@ -156,6 +156,31 @@ export class OidcService {
     return this.configured ? "global" : null;
   }
 
+  /**
+   * RP-initiated logout (OpenID Connect RP-Initiated Logout 1.0): the provider's end-session URL,
+   * so signing out of Neural Frontier also ends the provider session. Null when the provider has
+   * no end-session endpoint or is gone. The provider returns the browser to /sign-in.
+   */
+  async endSessionUrl(key: string | null, idToken: string | null): Promise<string | null> {
+    if (key !== "global" && !(key?.startsWith("tenant:") ?? false)) return null;
+    try {
+      const provider = await this.resolve(key as ProviderKey);
+      if (!provider) return null;
+      const client = await this.client(provider);
+      if (!client.serverMetadata().end_session_endpoint) return null;
+      return oidc
+        .buildEndSessionUrl(client, {
+          post_logout_redirect_uri: new URL("/sign-in", this.config.publicUrl).toString(),
+          state: "signed-out",
+          ...(idToken ? { id_token_hint: idToken } : {}),
+        })
+        .toString();
+    } catch (err) {
+      this.logger.warn({ err: String(err) }, "could not build the end-session URL");
+      return null;
+    }
+  }
+
   async beginLogin(
     returnTo: string,
     key: ProviderKey,
@@ -192,7 +217,7 @@ export class OidcService {
   async completeLogin(
     callbackUrl: URL,
     state: LoginState,
-  ): Promise<{ claims: VerifiedClaims; context: ProviderContext }> {
+  ): Promise<{ claims: VerifiedClaims; context: ProviderContext; idToken: string | null }> {
     const provider = await this.resolve(state.provider);
     if (!provider) throw Errors.unauthenticated("This sign-in's identity provider was removed");
     const client = await this.client(provider);
@@ -228,6 +253,7 @@ export class OidcService {
         tenantId: provider.tenantId,
         requireEmailVerified: provider.requireEmailVerified,
       },
+      idToken: tokens.id_token ?? null,
     };
   }
 }

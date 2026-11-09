@@ -20,7 +20,7 @@ function toDto(r: Row): Identity {
     email: r.email,
     displayName: r.displayName,
     status: r.status,
-    source: "oidc",
+    source: r.scimManaged ? "scim" : "oidc",
     lastSignInAt: r.lastSignInAt?.toISOString() ?? null,
     createdAt: r.createdAt.toISOString(),
     roles: r.roleAssignments.map((a) => a.role),

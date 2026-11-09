@@ -74,7 +74,8 @@ export default async function SignInPage({
   const error = errorCode
     ? (SIGN_IN_ERRORS[errorCode] ?? "Sign-in couldn't be completed. Please try again.")
     : null;
-  const signedOut = params.signedOut === "1";
+  // `state=signed-out` comes back from the identity provider after single sign-out.
+  const signedOut = params.signedOut === "1" || params.state === "signed-out";
 
   return (
     <main className="dark relative grid min-h-dvh overflow-hidden bg-background text-foreground lg:grid-cols-[1.15fr_1fr]">

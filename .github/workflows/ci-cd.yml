@@ -38,7 +38,7 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     env:
-      APP_ROOT: /opt/neural-frontier
+      APP_ROOT: /license_monitoring/neural-frontier
       SERVICE: neural-frontier-web.service
       HEALTH_URL: http://127.0.0.1:3200/api/health
       KEEP_RELEASES: 5

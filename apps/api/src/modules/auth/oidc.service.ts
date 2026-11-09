@@ -80,13 +80,23 @@ export class OidcService {
     });
     const claims = tokens.claims();
     if (!claims) throw Errors.unauthenticated("The identity provider returned no ID token");
-    const email = typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+
+    // Many providers put email/profile only in the UserInfo response, not the ID token.
+    // UserInfo is bound to the ID token subject, so it cannot substitute another user's claims.
+    let profile: Record<string, unknown> = claims;
+    if (typeof claims.email !== "string" && tokens.access_token) {
+      profile = {
+        ...(await oidc.fetchUserInfo(client, tokens.access_token, claims.sub)),
+        ...claims,
+      };
+    }
+    const email = typeof profile.email === "string" ? profile.email.trim().toLowerCase() : "";
     return {
       issuer: claims.iss,
       subject: claims.sub,
       email,
-      emailVerified: claims.email_verified === true,
-      name: typeof claims.name === "string" ? claims.name : null,
+      emailVerified: profile.email_verified === true,
+      name: typeof profile.name === "string" ? profile.name : null,
     };
   }
 }

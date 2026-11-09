@@ -58,7 +58,8 @@ export class ProvisioningService {
       return this.finish(bound.tenantId, bound.id, bound.status, bound.tenant.status, claims, meta);
 
     if (!claims.email) return { ok: false, reason: "email_missing", tenantId: null };
-    if (this.config.oidc?.requireEmailVerified && !claims.emailVerified)
+    // Secure default: required unless an operator explicitly disabled it for their IdP.
+    if ((this.config.oidc?.requireEmailVerified ?? true) && !claims.emailVerified)
       return { ok: false, reason: "email_unverified", tenantId: null };
 
     const domain = claims.email.split("@")[1] ?? "";

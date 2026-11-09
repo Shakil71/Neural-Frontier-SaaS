@@ -81,9 +81,9 @@ else
 fi
 
 log "pruning old releases (keeping $KEEP_RELEASES)"
-cd "$RELEASES"
-mapfile -t old < <(ls -1dt -- */ | tail -n +$((KEEP_RELEASES + 1)))
+ACTIVE=$(readlink -f "$CURRENT")
+mapfile -t old < <(newest_first "$RELEASES" '*' | tail -n +$((KEEP_RELEASES + 1)))
 for d in "${old[@]}"; do
-  [[ "$RELEASES/${d%/}" == "$(readlink -f "$CURRENT")" ]] || rm -rf -- "${RELEASES:?}/${d%/}"
+  if [[ -d $d && $d != "$ACTIVE" ]]; then rm -rf -- "$d"; fi
 done
 log "done"

@@ -213,8 +213,9 @@ describe("health and operations", () => {
       (await owner.get("/api/v1/system/health").expect(200)).body,
     );
     expect(report.dependencies.find((d) => d.name === "mysql")?.status).toBe("up");
-    const auditor = await signIn(t, acme.tenantId, acme.auditor);
-    await auditor.get("/api/v1/system/health").expect(403);
+    // The member holds no permissions (the auditor was promoted earlier in this file).
+    const member = await signIn(t, acme.tenantId, acme.member);
+    await member.get("/api/v1/system/health").expect(403);
   });
 
   it("serves metrics to loopback only, never via the proxy", async () => {

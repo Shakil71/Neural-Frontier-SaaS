@@ -26,14 +26,13 @@ echo "Configuration"
 for f in api.env web.env migrate.env secrets.env backup.key; do
   check "$CONF_DIR/$f present" test -f "$CONF_DIR/$f"
 done
-for f in api.env web.env migrate.env; do
-  mode=$(stat -c %a "$CONF_DIR/$f" 2>/dev/null)
-  [[ $mode == 640 ]] && pass "$f mode 640" || fail "$f mode is $mode, expected 640"
-done
-for f in secrets.env backup.key; do
-  mode=$(stat -c %a "$CONF_DIR/$f" 2>/dev/null)
-  [[ $mode == 600 ]] && pass "$f mode 600" || fail "$f mode is $mode, expected 600"
-done
+expect_mode() {
+  local file=$1 want=$2 mode
+  mode=$(stat -c %a "$CONF_DIR/$file" 2>/dev/null)
+  if [[ $mode == "$want" ]]; then pass "$file mode $want"; else fail "$file mode is ${mode:-missing}, expected $want"; fi
+}
+for f in api.env web.env migrate.env; do expect_mode "$f" 640; done
+for f in secrets.env backup.key; do expect_mode "$f" 600; done
 check "nginx configuration valid" nginx -t
 
 echo "Services"
@@ -45,12 +44,12 @@ check "Web listens on 127.0.0.1:$WEB_PORT only" bash -c "ss -tln | grep -q '127.
 check "API readiness" curl -fsS --max-time 5 "http://127.0.0.1:$API_PORT/api/health/ready"
 check "HTTPS front door serves sign-in" curl -fsSk --max-time 5 "https://127.0.0.1:$HTTPS_PORT/sign-in"
 code=$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:$HTTPS_PORT/api/metrics")
-[[ $code == 404 ]] && pass "metrics not exposed publicly" || fail "metrics endpoint returned $code via nginx"
+if [[ $code == 404 ]]; then pass "metrics not exposed publicly"; else fail "metrics endpoint returned $code via nginx"; fi
 release=$(cat "$CURRENT/RELEASE" 2>/dev/null || echo none)
 pass "current release: $release"
 
 echo "Data protection"
-latest=$(ls -1t "$BACKUP_DIR"/"$DB_NAME"-*.sql.gz.enc 2>/dev/null | head -n1)
+latest=$(newest_first "$BACKUP_DIR" "${DB_NAME}-*.sql.gz.enc" | head -n1)
 if [[ -z $latest ]]; then
   warn "no backups yet (timer runs daily at 02:30)"
 elif [[ $(find "$latest" -mmin -$((36 * 60)) | wc -l) -eq 1 ]]; then
@@ -65,7 +64,7 @@ else
 fi
 for d in "$APP_ROOT" "$BACKUP_DIR"; do
   use=$(df --output=pcent "$d" | tail -n1 | tr -dc 0-9)
-  ((use < 85)) && pass "$d disk ${use}% used" || warn "$d disk ${use}% used"
+  if ((use < 85)); then pass "$d disk ${use}% used"; else warn "$d disk ${use}% used"; fi
 done
 
 echo

@@ -26,7 +26,8 @@ test("unknown organisations get a clear explanation", async ({ page }) => {
   await page.locator('input[name="login"]').fill("stranger@unknown-org.example");
   await page.locator('input[name="password"]').fill("e2e");
   await page.locator('button[type="submit"]').click();
-  await expect(page.getByRole("alert")).toContainText("isn't registered with Neural Frontier");
+  // (Next.js' route announcer is also role="alert", so match the message itself.)
+  await expect(page.getByText("isn't registered with Neural Frontier")).toBeVisible();
 });
 
 test("owner signs in, grants a role, and the change is audited", async ({ page }) => {

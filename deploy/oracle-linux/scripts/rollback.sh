@@ -17,7 +17,7 @@ CURRENT_ID=$(basename "$(readlink -f "$CURRENT")")
 if [[ $# -ge 1 ]]; then
   TARGET_ID=$1
 else
-  TARGET_ID=$(cd "$RELEASES" && ls -1dt -- */ | sed 's#/$##' | grep -vx "$CURRENT_ID" | head -n1 || true)
+  TARGET_ID=$(newest_first "$RELEASES" '*' | xargs -r -n1 basename | grep -vx "$CURRENT_ID" | head -n1 || true)
 fi
 [[ -n ${TARGET_ID:-} && -d "$RELEASES/$TARGET_ID" ]] || die "no release to roll back to"
 [[ $TARGET_ID != "$CURRENT_ID" ]] || die "$TARGET_ID is already current"

@@ -30,6 +30,11 @@ env_get() {
   grep -E "^${key}=" "$file" | tail -n1 | cut -d= -f2-
 }
 
+# Lists entries of DIR matching GLOB, newest first, one path per line (no `ls` parsing).
+newest_first() {
+  find "$1" -mindepth 1 -maxdepth 1 -name "$2" -printf '%T@\t%p\n' | sort -rn | cut -f2-
+}
+
 # Polls a URL until it returns 2xx (and optionally contains a string).
 wait_for() {
   local url=$1 expect=${2:-} tries=${3:-30} body

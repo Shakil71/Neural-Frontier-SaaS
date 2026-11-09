@@ -12,7 +12,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/lib.sh"
 need_root
 
-FILE=${1:-$(ls -1t "$BACKUP_DIR"/"${DB_NAME}"-*.sql.gz.enc 2>/dev/null | head -n1)}
+FILE=${1:-$(newest_first "$BACKUP_DIR" "${DB_NAME}-*.sql.gz.enc" | head -n1)}
 [[ -n $FILE && -f $FILE ]] || die "no backup found in $BACKUP_DIR"
 TEST_DB="nf_restore_test"
 EXPECTED_TABLES=(tenants tenant_domains identities roles role_assignments sessions audit_events idempotency_keys _prisma_migrations)

@@ -87,9 +87,9 @@ describe("discovery", () => {
     const known = await pub("discover")
       .send({ email: `nobody@${f.domain}` })
       .expect(200);
-    expect(known.body).toEqual({ password: true, sso: false });
+    expect(known.body).toEqual({ password: true, sso: false, passwordReset: false });
     const unknown = await pub("discover").send({ email: "x@unregistered.example" }).expect(200);
-    expect(unknown.body).toEqual({ password: false, sso: false });
+    expect(unknown.body).toEqual({ password: false, sso: false, passwordReset: false });
   });
 
   it("refuses cross-site and non-JSON requests (login CSRF)", async () => {

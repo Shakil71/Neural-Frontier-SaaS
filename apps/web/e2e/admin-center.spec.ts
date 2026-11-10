@@ -1,3 +1,4 @@
+import { type AddressInfo, createServer } from "node:net";
 import { createHmac } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -380,6 +381,94 @@ test("built-in sign-in: a set-up link, a password, then two-step sign-in", async
   await page.goto("/audit");
   await expect(page.getByRole("row", { name: /Two-factor turned on/ }).first()).toBeVisible();
   await grace.context().close();
+});
+
+/** A tiny SMTP server that records messages (the organisation's "mail server" in this test). */
+async function mailSink() {
+  const received: string[] = [];
+  const server = createServer((socket) => {
+    let buf = "";
+    let inData = false;
+    let body: string[] = [];
+    const send = (l: string) => socket.write(`${l}\r\n`);
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      buf += chunk;
+      let i: number;
+      while ((i = buf.indexOf("\r\n")) >= 0) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (inData) {
+          if (line === ".") {
+            inData = false;
+            received.push(body.join("\n"));
+            body = [];
+            send("250 Ok: queued");
+          } else body.push(line);
+          continue;
+        }
+        const verb = line.split(" ")[0]!.toUpperCase();
+        if (verb === "EHLO") send("250 sink.e2e");
+        else if (verb === "DATA") {
+          inData = true;
+          send("354 Go ahead");
+        } else if (verb === "QUIT") {
+          send("221 Bye");
+          socket.end();
+        } else send("250 Ok");
+      }
+    });
+    send("220 sink.e2e ESMTP");
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as AddressInfo).port;
+  return { port, received, close: () => new Promise<void>((r) => server.close(() => r())) };
+}
+
+test("email delivery is set up and tested from the GUI; sessions are listed", async ({ page }) => {
+  const sink = await mailSink();
+  try {
+    await signInAs(page, "ada.owner@acme.example");
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Set up email" }).click();
+    const form = page.getByRole("dialog", { name: "Set up email delivery" });
+    await form.getByRole("button", { name: "Relay on this server" }).click();
+    await form.getByLabel("Port").fill(String(sink.port));
+    await form.getByLabel("Sender address").fill("no-reply@acme.example");
+    await page.screenshot({ path: "test-results/screenshots/22-email-setup-light.png" });
+    await form.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText("Not tested yet")).toBeVisible();
+
+    await page.getByRole("button", { name: "Send me a test" }).click();
+    await expect(page.getByText("Test sent to ada.owner@acme.example")).toBeVisible();
+    await expect(page.getByText("Working", { exact: true })).toBeVisible();
+    expect(sink.received).toHaveLength(1);
+    expect(sink.received[0]).toContain("To: <ada.owner@acme.example>");
+    await page.screenshot({
+      path: "test-results/screenshots/23-email-working-light.png",
+      fullPage: true,
+    });
+
+    // The sign-in page now offers "Forgot password?" for this organisation.
+    const fresh = await (await page.context().browser()!.newContext()).newPage();
+    await fresh.goto("/sign-in");
+    await fresh.getByLabel("Work email").fill("grace.analyst@acme.example");
+    await fresh.getByRole("button", { name: "Continue", exact: true }).click();
+    await fresh.getByRole("button", { name: "Forgot password?" }).click();
+    await expect(fresh.getByText("Check your email")).toBeVisible();
+    await fresh.context().close();
+
+    // My account lists this browser's session.
+    await page.goto("/account/security");
+    await expect(page.getByText("Where you're signed in")).toBeVisible();
+    await expect(page.getByText("This browser")).toBeVisible();
+    await page.screenshot({
+      path: "test-results/screenshots/24-sessions-dark.png",
+      fullPage: true,
+    });
+  } finally {
+    await sink.close();
+  }
 });
 
 // Runs last: it changes how the Acme tenant signs in.

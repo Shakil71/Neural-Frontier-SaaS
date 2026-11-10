@@ -40,13 +40,13 @@ connector; **2b** covers the items that need external systems to test against.
 Goal: Neural Frontier runs without a third-party identity server, and everything is managed in
 the Admin Center (ADR 0010). The outline below keeps its numbering.
 
-| Pri | Item                                                                                            | Acceptance criteria                             | Status    |
-| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------- |
-| P0  | Built-in accounts: password, TOTP two-step, recovery codes, links, policy, lockout, break-glass | Integration + E2E tests; audited                | 3a: built |
-| P0  | Neural Frontier as an OIDC provider; migrate sign-in off Keycloak and remove it                 | Existing users keep access; Keycloak stopped    | 3c        |
-| P1  | Passkeys (WebAuthn)                                                                             | Register and sign in on Chrome, Safari, Android | 3b        |
-| P1  | Outgoing email (own SMTP client): password reset, invitations                                   | Delivered through the host's mail relay         | 3b        |
-| P1  | "Where you're signed in": list and end your own sessions                                        | Session revoked immediately                     | 3b        |
+| Pri | Item                                                                                            | Acceptance criteria                             | Status                                                                                        |
+| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| P0  | Built-in accounts: password, TOTP two-step, recovery codes, links, policy, lockout, break-glass | Integration + E2E tests; audited                | 3a: built                                                                                     |
+| P0  | Neural Frontier as an OIDC provider; migrate sign-in off Keycloak and remove it                 | Existing users keep access; Keycloak stopped    | 3c                                                                                            |
+| P1  | Passkeys (WebAuthn)                                                                             | Register and sign in on Chrome, Safari, Android | 3c (needs a domain: browsers refuse passkeys on IP addresses)                                 |
+| P1  | Outgoing email (own SMTP client): password reset, invitations                                   | Delivered through the host's mail relay         | 3b: built; tested against an in-suite SMTP server (plain, STARTTLS, TLS), not a real provider |
+| P1  | "Where you're signed in": list and end your own sessions                                        | Session revoked immediately                     | 3b: built                                                                                     |
 
 ## Phase 3 – 10 (outline; detailed at each phase gate)
 

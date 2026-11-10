@@ -83,6 +83,8 @@ export const DiscoverSignInSchema = z.object({ email: EmailSchema });
 export const DiscoverSignInResponseSchema = z.object({
   password: z.boolean(),
   sso: z.boolean(),
+  /** "Forgot password?" by email is available (the organisation has email set up). */
+  passwordReset: z.boolean(),
 });
 export type DiscoverSignInResponse = z.infer<typeof DiscoverSignInResponseSchema>;
 
@@ -128,13 +130,19 @@ export const SecondFactorCodeSchema = z.object({
 export const SignInLinkPurposeSchema = z.enum(["setup", "reset"]);
 export type SignInLinkPurpose = z.infer<typeof SignInLinkPurposeSchema>;
 
-export const CreateSignInLinkSchema = z.object({ reason: z.string().trim().min(3).max(500) });
+export const CreateSignInLinkSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+  /** Also email the link to the person (needs email delivery set up). */
+  sendEmail: z.boolean().default(false),
+});
 
 export const IssuedSignInLinkSchema = z.object({
   purpose: SignInLinkPurposeSchema,
   /** Shown once. Share it with the person over a channel you trust. */
   url: z.string(),
   expiresAt: z.iso.datetime(),
+  /** Where the link was emailed, when it was. */
+  emailedTo: z.string().nullable(),
 });
 export type IssuedSignInLink = z.infer<typeof IssuedSignInLinkSchema>;
 
@@ -200,6 +208,10 @@ export const IdentitySignInMethodsSchema = z.object({
   pendingLink: z
     .object({ purpose: SignInLinkPurposeSchema, expiresAt: z.iso.datetime() })
     .nullable(),
+  /** Sessions currently signed in. */
+  activeSessions: z.number().int(),
+  /** The organisation can email links. */
+  emailAvailable: z.boolean(),
   /** False when the caller may not change this person's sign-in (more access than the caller). */
   manageable: z.boolean(),
 });

@@ -172,6 +172,15 @@ It prints a one-time link. It runs the API's own command with the API's configur
 log records it as `system:operator`. Two-step sign-in needs `NF_DATA_KEY`, which `install.sh`
 already generates.
 
+## Email delivery (Phase 3b)
+
+Each organisation connects its own mail server in **Organisation → Email delivery**, then clicks
+**Send me a test**. The worker sends queued mail; if messages stay "queued", check
+`systemctl status neural-frontier-worker`. A relay on this server (for example Postfix on
+127.0.0.1:25) can use any port and no encryption; remote servers need STARTTLS or TLS on a mail port.
+If the mail server uses a private CA, add `NF_SMTP_CA_FILE=/path/to/ca.pem` to `api.env` and restart
+the API and worker.
+
 ## Backups
 
 ```bash

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Inject,
@@ -20,6 +21,7 @@ import {
   DiscoverSignInSchema,
   PasswordSignInSchema,
   RedeemSignInLinkSchema,
+  RequestPasswordResetSchema,
   SecondFactorCodeSchema,
   SignInLinkTokenSchema,
   type SignInStep,
@@ -184,6 +186,51 @@ export class SignInController {
     const { token, password } = parse(RedeemSignInLinkSchema, body);
     return this.local.redeemLink(token, password, requestMeta(req));
   }
+
+  /**
+   * "Forgot password?". Always 202 with the same body, whether or not an account exists or an
+   * email was sent, so it can't be used to find out who has an account.
+   */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post("password-reset")
+  @HttpCode(202)
+  async passwordReset(@Req() req: Request, @Body() body: unknown) {
+    assertSameSiteJson(req, this.config);
+    await this.local.requestPasswordReset(
+      parse(RequestPasswordResetSchema, body).email,
+      requestMeta(req),
+    );
+    return { accepted: true };
+  }
+}
+
+/** My account → Where you're signed in. */
+@ApiTags("me")
+@Controller("v1/me/sessions")
+export class MySessionsController {
+  constructor(private readonly local: LocalAuthService) {}
+
+  @Get()
+  list(@CurrentPrincipal() p: Principal) {
+    return this.local.mySessions(p);
+  }
+
+  @Delete(":sessionId")
+  @HttpCode(200)
+  revoke(
+    @CurrentPrincipal() p: Principal,
+    @Param("sessionId", new ParseUUIDPipe()) sessionId: string,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.local.revokeMySession(p, sessionId, meta);
+  }
+
+  @Post("revoke-others")
+  @HttpCode(200)
+  revokeOthers(@CurrentPrincipal() p: Principal, @Meta() meta: RequestMeta) {
+    return this.local.revokeMyOtherSessions(p, meta);
+  }
 }
 
 /** My account → Security. Any signed-in person, for themselves only. */
@@ -271,11 +318,27 @@ export class IdentitySignInController {
     @Body() body: unknown,
     @Meta() meta: RequestMeta,
   ) {
-    return this.local.createSignInLink(
+    const input = parse(CreateSignInLinkSchema, body);
+    return this.local.createSignInLink(p, p.tenantId, id, input.reason, meta, {
+      sendEmail: input.sendEmail,
+      kind: "admin",
+    });
+  }
+
+  /** Ends every session of this person (a lost laptop, a departure). */
+  @Post("sessions/revoke")
+  @HttpCode(200)
+  @RequirePermission("identities.manage")
+  signOutEverywhere(
+    @CurrentPrincipal() p: Principal,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: unknown,
+    @Meta() meta: RequestMeta,
+  ) {
+    return this.local.signOutEverywhere(
       p,
-      p.tenantId,
       id,
-      parse(CreateSignInLinkSchema, body).reason,
+      parse(AdminCredentialActionSchema, body).reason,
       meta,
     );
   }

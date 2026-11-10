@@ -7,6 +7,8 @@ import { OidcService } from "./modules/auth/oidc.service.js";
 import { SessionService } from "./modules/auth/session.service.js";
 import { AuthorizationService } from "./modules/authz/authorization.service.js";
 import { LocalAuthService } from "./modules/local-auth/local-auth.service.js";
+import { EmailService } from "./modules/email/email.service.js";
+import { JobQueue } from "./modules/jobs/job-queue.js";
 
 /** Operator commands (dist/cli.js): no HTTP, only what the commands need. */
 @Module({})
@@ -20,6 +22,8 @@ export class CliModule {
         AuthorizationService,
         SessionService,
         OidcService,
+        JobQueue,
+        EmailService,
         LocalAuthService,
       ],
     };

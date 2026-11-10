@@ -14,6 +14,9 @@ import {
   Link2,
   Lock,
   LockOpen,
+  LogOut,
+  MailCheck,
+  MonitorSmartphone,
   ShieldOff,
   Smartphone,
 } from "lucide-react";
@@ -30,7 +33,7 @@ import { usePermissions } from "@/lib/session";
 const errorMessage = (err: unknown) =>
   err instanceof ApiRequestError ? err.message : "Something went wrong";
 
-type Action = "link" | "reset-two-factor" | "unlock";
+type Action = "link" | "reset-two-factor" | "unlock" | "sessions/revoke";
 
 const ACTIONS: Record<
   Action,
@@ -67,6 +70,15 @@ const ACTIONS: Record<
     icon: <LockOpen />,
     reason: "Verified with the person",
   },
+  "sessions/revoke": {
+    title: "Sign out everywhere?",
+    description:
+      "Ends every session this person has, on every device, right away. They can sign in again unless you also suspend them or reset their password.",
+    button: "Sign out everywhere",
+    icon: <LogOut />,
+    danger: true,
+    reason: "",
+  },
 };
 
 function Row({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
@@ -99,6 +111,13 @@ function IssuedLink({ link, onDone }: { link: IssuedSignInLink; onDone: () => vo
           {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
         </button>
       </div>
+      {link.emailedTo && (
+        <p className="flex items-center gap-2 rounded-lg border border-success/30 bg-success-soft/50 px-3 py-2 text-[12.5px]">
+          <MailCheck className="size-4 shrink-0 text-success" aria-hidden />
+          Emailed to <span className="font-medium">{link.emailedTo}</span>. Delivery shows in
+          Organisation → Email delivery.
+        </p>
+      )}
       <p className="text-[12.5px] leading-relaxed text-muted">
         Works once, until {formatDateTime(link.expiresAt)}. It isn&apos;t shown again; creating a
         new link cancels this one.
@@ -124,12 +143,13 @@ export function SignInSection({ identityId, isSelf }: { identityId: string; isSe
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [issued, setIssued] = useState<IssuedSignInLink | null>(null);
+  const [sendEmail, setSendEmail] = useState(true);
 
   const mutation = useMutation({
     mutationFn: async (a: Action) => {
       const res = await api(`/api/v1/identities/${identityId}/sign-in/${a}`, {
         method: "POST",
-        body: { reason },
+        body: a === "link" ? { reason, sendEmail: sendEmail && !!m?.emailAvailable } : { reason },
       });
       return a === "link" ? IssuedSignInLinkSchema.parse(res) : null;
     },
@@ -137,7 +157,13 @@ export function SignInSection({ identityId, isSelf }: { identityId: string; isSe
       void client.invalidateQueries({ queryKey: key });
       if (link) setIssued(link);
       else {
-        toast.success(a === "unlock" ? "Account unlocked." : "Two-step sign-in was reset.");
+        toast.success(
+          a === "unlock"
+            ? "Account unlocked."
+            : a === "sessions/revoke"
+              ? "Signed out everywhere."
+              : "Two-step sign-in was reset.",
+        );
         close();
       }
     },
@@ -205,6 +231,9 @@ export function SignInSection({ identityId, isSelf }: { identityId: string; isSe
                 <Badge>Not linked</Badge>
               )}
             </Row>
+            <Row icon={<MonitorSmartphone />} label="Active sessions">
+              <Badge tone={m.activeSessions > 0 ? "primary" : "neutral"}>{m.activeSessions}</Badge>
+            </Row>
             {(locked || m.failedAttempts > 0) && (
               <Row
                 icon={<Lock />}
@@ -245,6 +274,11 @@ export function SignInSection({ identityId, isSelf }: { identityId: string; isSe
                     <LockOpen /> Unlock
                   </Button>
                 )}
+                {m.activeSessions > 0 && (
+                  <Button size="sm" variant="danger-soft" onClick={() => open("sessions/revoke")}>
+                    <LogOut /> Sign out everywhere
+                  </Button>
+                )}
               </div>
             )
           )}
@@ -282,6 +316,22 @@ export function SignInSection({ identityId, isSelf }: { identityId: string; isSe
                     onChange={(e) => setReason(e.target.value)}
                   />
                 </div>
+                {action === "link" &&
+                  (m?.emailAvailable ? (
+                    <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-relaxed">
+                      <input
+                        type="checkbox"
+                        checked={sendEmail}
+                        onChange={(e) => setSendEmail(e.target.checked)}
+                        className="mt-0.5 size-4 accent-[var(--primary)]"
+                      />
+                      Also email it to them. You&apos;ll still see the link to copy.
+                    </label>
+                  ) : (
+                    <p className="text-[12px] text-subtle">
+                      To email links automatically, set up Organisation → Email delivery.
+                    </p>
+                  ))}
                 <FieldError>{error}</FieldError>
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="ghost" onClick={close}>

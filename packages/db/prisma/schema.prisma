@@ -69,6 +69,8 @@ model Tenant {
   recoveryCodes           RecoveryCode[]
   signInLinks             SignInLink[]
   signInPolicy            TenantSignInPolicy?
+  emailSettings           TenantEmailSettings?
+  emailMessages           EmailMessage[]
 
   @@map("tenants")
 }
@@ -658,4 +660,50 @@ model TenantSignInPolicy {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_sign_in_policies")
+}
+
+/// The organisation's outgoing mail server (Phase 3b). The password is sealed with NF_DATA_KEY.
+model TenantEmailSettings {
+  tenantId        String    @id @db.Char(36)
+  host            String    @db.VarChar(253)
+  port            Int
+  /// "starttls" | "tls" | "none"
+  security        String    @db.VarChar(16)
+  username        String?   @db.VarChar(254)
+  passwordSealed  Bytes?    @db.VarBinary(2048)
+  passwordHint    String?   @db.VarChar(12)
+  fromAddress     String    @db.VarChar(254)
+  fromName        String    @db.VarChar(120)
+  enabled         Boolean   @default(true)
+  lastTestAt      DateTime? @db.DateTime(3)
+  lastTestOk      Boolean?
+  lastTestMessage String?   @db.VarChar(500)
+  updatedAt       DateTime  @updatedAt @db.DateTime(3)
+  version         Int       @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_email_settings")
+}
+
+/// Outbox and delivery log. The body (which can hold a one-time link) is sealed, and erased
+/// once the message is sent or given up on.
+model EmailMessage {
+  id         String    @id @default(uuid(7)) @db.Char(36)
+  tenantId   String    @db.Char(36)
+  kind       String    @db.VarChar(32)
+  toAddress  String    @db.VarChar(254)
+  subject    String    @db.VarChar(255)
+  bodySealed Bytes?    @db.MediumBlob
+  /// "queued" | "sent" | "failed"
+  status     String    @default("queued") @db.VarChar(16)
+  attempts   Int       @default(0)
+  lastError  String?   @db.VarChar(500)
+  createdAt  DateTime  @default(now()) @db.DateTime(3)
+  sentAt     DateTime? @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@map("email_messages")
 }

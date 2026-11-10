@@ -26,6 +26,8 @@ import { OidcService } from "../auth/oidc.service.js";
 import { SessionService } from "../auth/session.service.js";
 import { hashToken, safeReturnTo } from "../auth/tokens.js";
 import { AuthorizationService } from "../authz/authorization.service.js";
+import { EmailService } from "../email/email.service.js";
+import { passwordResetEmail, signInLinkEmail } from "../email/templates.js";
 import type { SecondFactorChallenge } from "./challenge.js";
 import { dummyHash, hashPassword, needsRehash, verifyPassword } from "./password.js";
 import { newTotpSecret, otpauthUri, verifyTotp } from "./totp.js";
@@ -43,8 +45,23 @@ const LINK_TTL_MS: Record<SignInLinkPurpose, number> = {
   reset: 24 * 3_600_000,
 };
 
-/** Who issued an action: a signed-in person, or the operator break-glass command. */
+/** Who issued an action: a signed-in person, or the system (break-glass command, self-service reset). */
 export type Actor = Principal | { kind: "operator"; label: string };
+
+/** At most one self-service reset email per person in this window. */
+const RESET_REQUEST_INTERVAL_MS = 2 * 60_000;
+
+/** "13 Nov 2026, 17:46 UTC": unambiguous for any reader, wherever they are. */
+function formatExpiry(d: Date): string {
+  return `${new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(d)} UTC`;
+}
 
 const totpContext = (tenantId: string, identityId: string) => `totp:${tenantId}:${identityId}`;
 
@@ -82,6 +99,7 @@ export class LocalAuthService {
     private readonly sessions: SessionService,
     private readonly authz: AuthorizationService,
     private readonly oidc: OidcService,
+    private readonly email: EmailService,
   ) {}
 
   // ───────────────────────── Policy ─────────────────────────
@@ -173,7 +191,11 @@ export class LocalAuthService {
       !!td?.verifiedAt &&
       td.tenant.status === "active" &&
       (await this.passwordRefusal(td.tenantId)) === null;
-    return { password, sso: (await this.oidc.chooseProvider(email)) !== null };
+    return {
+      password,
+      sso: (await this.oidc.chooseProvider(email)) !== null,
+      passwordReset: td && password ? await this.email.available(td.tenantId) : false,
+    };
   }
 
   private invalid(): AppError {
@@ -828,6 +850,8 @@ export class LocalAuthService {
           }
         : null,
       manageable: await this.manageable(actor, identityId),
+      activeSessions: await this.sessions.countActive(tenantId, identityId),
+      emailAvailable: await this.email.available(tenantId),
     };
   }
 
@@ -843,10 +867,16 @@ export class LocalAuthService {
     identityId: string,
     reason: string,
     meta: RequestMeta,
+    opts: { sendEmail?: boolean; kind?: "admin" | "self_service" } = {},
   ): Promise<IssuedSignInLink> {
     const identity = await this.targetIdentity(tenantId, identityId);
     await this.assertManageable(actor, tenantId, identityId);
     if (identity.status !== "active") throw Errors.conflict("Reactivate this person first.");
+    if (opts.sendEmail && !(await this.email.available(tenantId))) {
+      throw Errors.conflict(
+        "Email delivery isn't set up. Set it up in Organisation → Email delivery, or copy the link instead.",
+      );
+    }
     const refused = await this.passwordRefusal(tenantId);
     if (refused) {
       throw Errors.conflict(
@@ -888,7 +918,144 @@ export class LocalAuthService {
     });
     // The token travels in the fragment: browsers never send it to a server or in a Referer.
     const url = new URL(`/sign-in/setup#${token}`, this.config.publicUrl).toString();
-    return { purpose, url, expiresAt: expiresAt.toISOString() };
+    let emailedTo: string | null = null;
+    if (opts.sendEmail) {
+      const tenant = await this.database.system.tenant.findUniqueOrThrow({
+        where: { id: tenantId },
+      });
+      const common = {
+        tenantName: tenant.name,
+        displayName: identity.displayName,
+        url,
+        expires: formatExpiry(expiresAt),
+        purpose,
+      };
+      const mail =
+        opts.kind === "self_service"
+          ? passwordResetEmail(common)
+          : signInLinkEmail({
+              ...common,
+              issuedBy: actor.kind === "operator" ? "Your administrator" : actor.displayName,
+            });
+      const queued = await this.email.queue(
+        tenantId,
+        identity.email,
+        opts.kind === "self_service" ? "password_reset" : "sign_in_link",
+        mail,
+      );
+      emailedTo = queued ? identity.email : null;
+    }
+    return { purpose, url, expiresAt: expiresAt.toISOString(), emailedTo };
+  }
+
+  /**
+   * "Forgot password?": emails a reset (or set-up) link when the account exists and may sign in
+   * with a password. The caller always gets the same answer, whether or not anything was sent.
+   */
+  async requestPasswordReset(email: string, meta: RequestMeta): Promise<void> {
+    const address = email.trim().toLowerCase();
+    const who = await this.findByEmail(address);
+    if (!who) return;
+    const { tenantId, identityId } = who;
+    const identity = await this.database.db.identity.findUnique({
+      where: { id: identityId, tenantId },
+    });
+    if (!identity || identity.status !== "active") return;
+    if ((await this.passwordRefusal(tenantId)) || !(await this.email.available(tenantId))) return;
+    // Rate limit per person: repeated requests can't flood an inbox or keep voiding links.
+    const recent = await this.database.db.signInLink.count({
+      where: {
+        tenantId,
+        identityId,
+        createdAt: { gt: new Date(Date.now() - RESET_REQUEST_INTERVAL_MS) },
+      },
+    });
+    if (recent > 0) return;
+    await this.audit.record({
+      tenantId,
+      action: "auth.password_reset_requested",
+      outcome: "success",
+      actor: { id: null, label: address },
+      target: { type: "identity", id: identityId, label: identity.email },
+      meta,
+    });
+    await this.createSignInLink(
+      { kind: "operator", label: "system:password-reset" },
+      tenantId,
+      identityId,
+      "Requested from the sign-in page",
+      meta,
+      { sendEmail: true, kind: "self_service" },
+    );
+  }
+
+  // ───────────────────────── Sessions ─────────────────────────
+
+  async mySessions(p: Principal) {
+    const rows = await this.sessions.listActive(p.tenantId, p.identityId);
+    return {
+      sessions: rows.map((s) => ({
+        id: s.id,
+        createdAt: s.createdAt.toISOString(),
+        lastSeenAt: s.lastSeenAt.toISOString(),
+        expiresAt: s.expiresAt.toISOString(),
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        signedInWith: s.authProvider,
+        current: s.id === p.sessionId,
+      })),
+    };
+  }
+
+  async revokeMySession(p: Principal, sessionId: string, meta: RequestMeta) {
+    if (sessionId === p.sessionId) {
+      throw Errors.badRequest("To end this session, use Sign out.");
+    }
+    const res = await this.database.db.session.updateMany({
+      where: { tenantId: p.tenantId, identityId: p.identityId, id: sessionId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (res.count === 0) throw Errors.notFound("Session");
+    await this.audit.record({
+      tenantId: p.tenantId,
+      action: "auth.session_revoked",
+      outcome: "success",
+      actor: { id: p.identityId, label: p.email },
+      meta,
+      metadata: { sessionId },
+    });
+    return { revoked: 1 };
+  }
+
+  async revokeMyOtherSessions(p: Principal, meta: RequestMeta) {
+    const revoked = await this.sessions.revokeFor(p.tenantId, p.identityId, p.sessionId);
+    await this.audit.record({
+      tenantId: p.tenantId,
+      action: "auth.sessions_revoked",
+      outcome: "success",
+      actor: { id: p.identityId, label: p.email },
+      meta,
+      metadata: { revoked, scope: "other_sessions" },
+    });
+    return { revoked };
+  }
+
+  /** Administrators: sign someone out everywhere (e.g. a lost laptop). */
+  async signOutEverywhere(actor: Principal, identityId: string, reason: string, meta: RequestMeta) {
+    const { tenantId } = actor;
+    const identity = await this.targetIdentity(tenantId, identityId);
+    await this.assertManageable(actor, tenantId, identityId);
+    const revoked = await this.sessions.revokeFor(tenantId, identityId);
+    await this.audit.record({
+      tenantId,
+      action: "auth.sessions_revoked",
+      outcome: "success",
+      actor: { id: actor.identityId, label: actor.email },
+      target: { type: "identity", id: identityId, label: identity.email },
+      meta,
+      metadata: { revoked, reason, scope: "all_sessions" },
+    });
+    return { revoked };
   }
 
   async resetTwoFactor(actor: Principal, identityId: string, reason: string, meta: RequestMeta) {

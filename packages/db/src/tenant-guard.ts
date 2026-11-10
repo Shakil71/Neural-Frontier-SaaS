@@ -32,6 +32,8 @@ export const TENANT_SCOPED_MODELS = new Set([
   "RecoveryCode",
   "SignInLink",
   "TenantSignInPolicy",
+  "TenantEmailSettings",
+  "EmailMessage",
 ]);
 
 const READ_OR_FILTERED_WRITE = new Set([

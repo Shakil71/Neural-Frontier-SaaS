@@ -71,6 +71,8 @@ model Tenant {
   signInPolicy            TenantSignInPolicy?
   emailSettings           TenantEmailSettings?
   emailMessages           EmailMessage[]
+  oauthApplications       OAuthApplication[]
+  oauthCodes              OAuthAuthorizationCode[]
 
   @@map("tenants")
 }
@@ -706,4 +708,70 @@ model EmailMessage {
 
   @@index([tenantId, createdAt])
   @@map("email_messages")
+}
+
+/// An application that signs people in with Neural Frontier (OpenID Connect client), Phase 3c.
+model OAuthApplication {
+  id                     String    @id @default(uuid(7)) @db.Char(36)
+  tenantId               String    @db.Char(36)
+  name                   String    @db.VarChar(120)
+  description            String    @default("") @db.VarChar(500)
+  /// "web" | "spa" | "native"
+  type                   String    @db.VarChar(16)
+  clientId               String    @unique @db.VarChar(64)
+  /// SHA-256 of the client secret (web applications only).
+  secretHash             Bytes?    @db.Binary(32)
+  secretHint             String?   @db.VarChar(12)
+  redirectUris           Json
+  postLogoutRedirectUris Json
+  /// Null: everyone in the organisation. Otherwise an array of role ids.
+  allowedRoleIds         Json?
+  enabled                Boolean   @default(true)
+  lastUsedAt             DateTime? @db.DateTime(3)
+  createdById            String?   @db.Char(36)
+  createdAt              DateTime  @default(now()) @db.DateTime(3)
+  updatedAt              DateTime  @updatedAt @db.DateTime(3)
+  version                Int       @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("oauth_applications")
+}
+
+/// Authorization codes: one use, 60 seconds, bound to the PKCE challenge and redirect URI.
+model OAuthAuthorizationCode {
+  id            String    @id @default(uuid(7)) @db.Char(36)
+  tenantId      String    @db.Char(36)
+  applicationId String    @db.Char(36)
+  identityId    String    @db.Char(36)
+  sessionId     String    @db.Char(36)
+  codeHash      Bytes     @unique @db.Binary(32)
+  redirectUri   String    @db.VarChar(1024)
+  scope         String    @db.VarChar(255)
+  nonce         String?   @db.VarChar(255)
+  codeChallenge String    @db.VarChar(128)
+  /// When the person actually signed in (the session start): the ID token's auth_time.
+  authTime      DateTime  @db.DateTime(3)
+  expiresAt     DateTime  @db.DateTime(3)
+  usedAt        DateTime? @db.DateTime(3)
+  createdAt     DateTime  @default(now()) @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, applicationId])
+  @@map("oauth_authorization_codes")
+}
+
+/// Deployment-wide token signing keys (ES256). The private key is sealed with NF_DATA_KEY.
+model OidcSigningKey {
+  kid              String    @id @db.VarChar(64)
+  alg              String    @db.VarChar(16)
+  publicJwk        Json
+  privateKeySealed Bytes     @db.VarBinary(4096)
+  createdAt        DateTime  @default(now()) @db.DateTime(3)
+  /// Retired keys stay published (JWKS) until tokens signed with them have expired.
+  retiredAt        DateTime? @db.DateTime(3)
+
+  @@map("oidc_signing_keys")
 }

@@ -13,3 +13,4 @@ export * from "./scim.js";
 export * from "./servers.js";
 export * from "./local-auth.js";
 export * from "./email.js";
+export * from "./applications.js";

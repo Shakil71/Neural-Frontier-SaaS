@@ -181,6 +181,14 @@ Each organisation connects its own mail server in **Organisation → Email deliv
 If the mail server uses a private CA, add `NF_SMTP_CA_FILE=/path/to/ca.pem` to `api.env` and restart
 the API and worker.
 
+## Applications: sign in with Neural Frontier (Phase 3c)
+
+Administrators register apps in **Applications**. Apps need only the issuer
+(`https://<host>:8643/api/oidc`): discovery provides the rest. Behind a self-signed certificate,
+apps must trust `/etc/pki/tls/neural-frontier/selfsigned.crt`. With a domain and a real certificate
+they work out of the box. The token signing key is created on first use and sealed with
+`NF_DATA_KEY`: keep that key backed up, like the database.
+
 ## Backups
 
 ```bash

@@ -31,7 +31,8 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 | Email delivery (own SMTP client), "Forgot password?", emailed links                                                         | Native     | ✅ Built (3b) |
 | Sessions: list and end your own; admins sign people out everywhere                                                          | Native     | ✅ Built (3b) |
 | Passkeys / WebAuthn (needs a domain name)                                                                                   | Native     | ⬜ Phase 3c   |
-| Neural Frontier as an OIDC provider (replaces Keycloak)                                                                     | Native     | ⬜ Phase 3c   |
+| Neural Frontier as an OIDC provider: "Sign in with Neural Frontier" for other apps                                          | Native     | ✅ Built (3c) |
+| Retire Keycloak (deployment sign-in fully built-in)                                                                         | Native     | ⬜ Phase 3c-3 |
 | Linux inventory agent (Go) and Servers page                                                                                 | Native     | ✅ Built (2d) |
 | Custom roles, ABAC conditions, JIT elevation, access reviews                                                                | Native     | ⬜ Phase 2–5  |
 | OAuth client credentials (service principals)                                                                               | Native     | ✅ Built (2a) |

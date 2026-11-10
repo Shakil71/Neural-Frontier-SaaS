@@ -1,6 +1,7 @@
 import type { Permission } from "@nf/contracts";
 import {
   Activity,
+  AppWindow,
   BookUser,
   Bot,
   Building2,
@@ -52,6 +53,14 @@ export const NAV: { group: string; items: NavItem[] }[] = [
         icon: ShieldCheck,
         permission: "roles.read",
         keywords: "rbac permissions",
+      },
+      {
+        href: "/applications",
+        label: "Applications",
+        icon: AppWindow,
+        permission: "applications.read",
+        keywords:
+          "oidc openid connect single sign-on sso apps clients sign in with neural frontier",
       },
     ],
   },

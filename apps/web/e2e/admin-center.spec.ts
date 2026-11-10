@@ -1,5 +1,6 @@
 import { type AddressInfo, createServer } from "node:net";
 import { createHmac } from "node:crypto";
+import * as oidc from "openid-client";
 import { expect, type Page, test } from "@playwright/test";
 
 async function signInAs(page: Page, email: string) {
@@ -469,6 +470,80 @@ test("email delivery is set up and tested from the GUI; sessions are listed", as
   } finally {
     await sink.close();
   }
+});
+
+test("an application signs people in with Neural Frontier (checked by an independent OIDC client)", async ({
+  page,
+}) => {
+  const CALLBACK = "http://localhost:3496/callback";
+  await signInAs(page, "ada.owner@acme.example");
+
+  // Register the app in the Admin Center.
+  await page.getByRole("link", { name: "Applications" }).click();
+  await expect(page.getByRole("heading", { name: "Applications" })).toBeVisible();
+  await page.getByRole("button", { name: "Register application" }).first().click();
+  const form = page.getByRole("dialog", { name: "Register an application" });
+  await form.getByLabel("Name").fill("Partner portal");
+  await form.getByLabel("Redirect addresses (one per line)").fill(CALLBACK);
+  await page.screenshot({ path: "test-results/screenshots/25-register-app-light.png" });
+  await form.getByRole("button", { name: "Register application" }).click();
+  const issued = page.getByRole("dialog", { name: "Copy the client secret now" });
+  const codes = issued.locator("code");
+  const issuer = (await codes.nth(0).textContent()) ?? "";
+  const clientId = (await codes.nth(1).textContent()) ?? "";
+  const clientSecret = (await codes.nth(2).textContent()) ?? "";
+  expect(clientSecret).toMatch(/^nfcs_/);
+  await issued.getByRole("button", { name: "Done" }).click();
+
+  // The app: a real OpenID Connect client library, not our code.
+  const config = await oidc.discovery(new URL(issuer), clientId, clientSecret, undefined, {
+    execute: [oidc.allowInsecureRequests],
+  });
+  const verifier = oidc.randomPKCECodeVerifier();
+  const state = oidc.randomState();
+  const nonce = oidc.randomNonce();
+  const authUrl = oidc.buildAuthorizationUrl(config, {
+    redirect_uri: CALLBACK,
+    scope: "openid email profile roles",
+    code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
+    code_challenge_method: "S256",
+    state,
+    nonce,
+  });
+
+  // Ada is already signed in, so her browser is sent straight back to the app with a code.
+  // (Sent with her browser's cookies; the app's address is read from the redirect, since
+  // nothing listens there in this test.)
+  const res = await page.request.get(authUrl.toString(), { maxRedirects: 0 });
+  expect(res.status()).toBe(303);
+  const callback = new URL(res.headers()["location"]!);
+  expect(callback.origin + callback.pathname).toBe(CALLBACK);
+
+  const tokens = await oidc.authorizationCodeGrant(config, callback, {
+    pkceCodeVerifier: verifier,
+    expectedState: state,
+    expectedNonce: nonce,
+  });
+  const claims = tokens.claims()!;
+  expect(claims).toMatchObject({
+    email: "ada.owner@acme.example",
+    email_verified: true,
+    roles: ["owner"],
+  });
+  const info = await oidc.fetchUserInfo(config, tokens.access_token, claims.sub);
+  expect(info.email).toBe("ada.owner@acme.example");
+
+  // The Admin Center shows it was used, and the audit log has the sign-in.
+  await page.goto("/applications");
+  await expect(page.getByText("Partner portal")).toBeVisible();
+  await page.screenshot({
+    path: "test-results/screenshots/26-applications-dark.png",
+    fullPage: true,
+  });
+  await page.goto("/audit");
+  await expect(
+    page.getByRole("row", { name: /Signed in to an application/ }).first(),
+  ).toBeVisible();
 });
 
 // Runs last: it changes how the Acme tenant signs in.

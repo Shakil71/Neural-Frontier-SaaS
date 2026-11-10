@@ -37,6 +37,7 @@ import { formatDateTime, formatNumber } from "@/lib/format";
 export const exposureKeys = {
   servers: ["servers"] as const,
   findings: ["server-findings"] as const,
+  updates: ["server-updates"] as const,
 };
 
 export const SEVERITY: Record<
@@ -135,6 +136,7 @@ function AcceptDialog({
       toast.success("Finding accepted. It no longer counts as open.");
       void client.invalidateQueries({ queryKey: exposureKeys.servers });
       void client.invalidateQueries({ queryKey: exposureKeys.findings });
+      void client.invalidateQueries({ queryKey: exposureKeys.updates });
       onOpenChange(false);
       form.reset();
     },
@@ -201,6 +203,7 @@ export function FindingItem({
       toast.success("Finding reopened");
       void client.invalidateQueries({ queryKey: exposureKeys.servers });
       void client.invalidateQueries({ queryKey: exposureKeys.findings });
+      void client.invalidateQueries({ queryKey: exposureKeys.updates });
     },
     onError: (err) =>
       toast.error(err instanceof ApiRequestError ? err.message : "Something went wrong"),

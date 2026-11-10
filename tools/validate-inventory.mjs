@@ -19,9 +19,11 @@ if (!result.success) {
 }
 const inv = result.data;
 // This agent release must report exposure (the schema keeps it optional for older agents).
-for (const field of ["listeners", "firewall", "ssh"]) {
+for (const field of ["listeners", "firewall", "ssh", "updates"]) {
   if (inv[field] === undefined) {
-    console.error(`::error::inventory.${field} is missing: the agent must report network exposure`);
+    console.error(
+      `::error::inventory.${field} is missing: the agent must report exposure and updates`,
+    );
     process.exit(1);
   }
 }
@@ -29,5 +31,7 @@ console.log(
   `valid: ${inv.hostname} · ${inv.os.prettyName} · ${inv.cpu.cores} CPUs · ` +
     `${inv.disks.length} disks · ${inv.services.length} services · ${inv.packageCount} packages (${inv.packageManager}) · ` +
     `${inv.listeners.length} listening sockets · firewall ${inv.firewall.kind}` +
-    `${inv.firewall.active ? "" : " (inactive)"} · sshd ${inv.ssh.present ? `on ${inv.ssh.ports.join(",")}` : "absent"}`,
+    `${inv.firewall.active ? "" : " (inactive)"} · sshd ${inv.ssh.present ? `on ${inv.ssh.ports.join(",")}` : "absent"} · ` +
+    `updates ${inv.updates.status}: ${inv.updates.pending.length} pending, ` +
+    `${inv.updates.pending.filter((p) => p.security).length} security, reboot ${inv.updates.rebootRequired}`,
 );

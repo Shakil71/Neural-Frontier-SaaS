@@ -288,6 +288,35 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
         usePam: "yes",
         permitEmptyPasswords: "no",
       },
+      // Patch state: a critical security update waiting and a newer kernel not yet running.
+      updates: {
+        status: "ok",
+        error: "",
+        manager: "rpm",
+        checkedAt: new Date().toISOString(),
+        metadataAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
+        pending: [
+          {
+            name: "openssl-libs",
+            arch: "x86_64",
+            version: "1:3.0.7-28.el9_4",
+            security: true,
+            severity: "Critical",
+            advisory: "ELSA-2026-1003",
+          },
+          {
+            name: "tzdata",
+            arch: "noarch",
+            version: "2024b-2.el9",
+            security: false,
+            severity: "",
+            advisory: "",
+          },
+        ],
+        rebootRequired: true,
+        runningKernel: "5.15.0-325.221.6.6.el9uek.x86_64",
+        newestKernel: "5.15.0-326.222.4.el9uek.x86_64",
+      },
     },
   });
   expect(report.status()).toBe(204);
@@ -313,10 +342,32 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
   await page.screenshot({ path: "test-results/screenshots/18-server-security-light.png" });
   await page.keyboard.press("Escape");
 
-  // The banner leads to the organisation-wide Exposure page, where the risk is accepted.
+  // Updates tab: the waiting security update and the reboot.
+  await page.getByRole("button", { name: "Open app-01.acme.example" }).click();
+  await sheet.getByRole("tab", { name: /Updates/ }).click();
+  await expect(sheet.getByText("Critical · ELSA-2026-1003")).toBeVisible();
+  await expect(sheet.getByText("A reboot is needed to finish updating")).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/20-server-updates-light.png" });
+  await page.keyboard.press("Escape");
+
+  // Infrastructure → Updates: patch compliance across servers.
+  await page.goto("/updates");
+  await expect(page.getByRole("heading", { name: "Updates", exact: true })).toBeVisible();
+  await expect(page.getByText("Most needed security updates")).toBeVisible();
+  await expect(page.getByText("openssl-libs")).toBeVisible();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: "test-results/screenshots/21-updates-light.png", fullPage: true });
+  await page.getByRole("button", { name: "app-01.acme.example" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "app-01.acme.example" }).getByText("Pending updates"),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.goto("/servers");
+
+  // The banner leads to the organisation-wide findings page, where the risk is accepted.
   await page.getByRole("link", { name: /high-severity findings? on 1 server/ }).click();
-  await expect(page).toHaveURL(/\/exposure$/);
-  await expect(page.getByRole("heading", { name: "Exposure" })).toBeVisible();
+  await expect(page).toHaveURL(/\/findings$/);
+  await expect(page.getByRole("heading", { name: "Security findings" })).toBeVisible();
   const redis = page
     .getByRole("listitem")
     .filter({ hasText: "Redis (tcp/6379) is reachable from the internet" });

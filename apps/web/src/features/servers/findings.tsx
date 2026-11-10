@@ -51,8 +51,8 @@ export function Exposure() {
     <>
       <PageHeader
         eyebrow="Infrastructure"
-        title="Exposure"
-        description="What your servers expose to the network: sensitive services reachable from outside, missing or permissive firewalls, and SSH settings that invite password guessing. Worked out from each agent's latest report."
+        title="Security findings"
+        description="What needs attention on your servers: sensitive services reachable from the network, missing or permissive firewalls, SSH settings that invite password guessing, security updates waiting and reboots needed. Worked out from each agent's latest report."
       />
 
       {q.isError ? (

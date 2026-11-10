@@ -23,6 +23,8 @@ type Inventory struct {
 	Listeners []Listener `json:"listeners"`
 	Firewall  Firewall   `json:"firewall"`
 	SSH       SSHConfig  `json:"ssh"`
+	// Patch compliance (agent 4b and later).
+	Updates Updates `json:"updates"`
 }
 
 type OSInfo struct {

@@ -69,6 +69,14 @@ export class ServersController {
     return this.servers.tenantFindings(p.tenantId);
   }
 
+  /** Patch compliance across all active servers (Infrastructure → Updates). */
+  @Get("server-updates")
+  @MachineAccess()
+  @RequirePermission("servers.read")
+  updates(@CurrentPrincipal() p: Principal) {
+    return this.servers.fleetUpdates(p.tenantId);
+  }
+
   /** Accept the risk of one finding, with a reason (audited). */
   @Put("servers/:id/findings/:key/acceptance")
   @RequirePermission("servers.manage")

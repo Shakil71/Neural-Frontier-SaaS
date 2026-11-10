@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   IssuedEnrollmentKeySchema,
+  FleetUpdatesSchema,
   ServerDetailSchema,
   ServerSummarySchema,
   TenantFindingsSchema,
@@ -355,6 +356,147 @@ describe("network exposure and findings", () => {
   });
 });
 
+describe("patch compliance", () => {
+  let token: string;
+  let serverId: string;
+  const updates = (overrides: Record<string, unknown> = {}) => ({
+    status: "ok",
+    error: "",
+    manager: "rpm",
+    checkedAt: new Date().toISOString(),
+    metadataAt: new Date(Date.now() - 3_600_000).toISOString(),
+    pending: [
+      {
+        name: "openssl-libs",
+        arch: "x86_64",
+        version: "1:3.0.7-28.el9_4",
+        security: true,
+        severity: "Critical",
+        advisory: "ELSA-2026-1003",
+      },
+      {
+        name: "tzdata",
+        arch: "noarch",
+        version: "2024b-2.el9",
+        security: false,
+        severity: "",
+        advisory: "",
+      },
+    ],
+    rebootRequired: true,
+    runningKernel: "5.15.0-325.221.6.6.el9uek.x86_64",
+    newestKernel: "5.15.0-326.222.4.el9uek.x86_64",
+    ...overrides,
+  });
+
+  it("reports pending and security updates, a needed reboot, and their findings", async () => {
+    const issued = await newKey(acme, { name: "patching" });
+    const res = await enroll(issued.key, machine(30), "app-02").expect(200);
+    token = res.body.agentToken;
+    serverId = res.body.serverId;
+    await report(token, inventory(machine(30), { hostname: "app-02", updates: updates() })).expect(
+      204,
+    );
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.updates).toMatchObject({
+      pending: 2,
+      security: 1,
+      urgent: 1,
+      rebootRequired: true,
+    });
+    expect(detail.patches!.pending[0]!.advisory).toBe("ELSA-2026-1003");
+    expect(detail.patchFindings.map((f) => [f.key, f.severity])).toEqual([
+      ["updates.security", "high"],
+      ["updates.reboot_required", "medium"],
+    ]);
+    // No exposure data from this agent: only the update findings count.
+    expect(detail.exposure).toBeNull();
+    expect(detail.findings).toEqual({ high: 1, medium: 1, low: 0 });
+
+    const fleet = FleetUpdatesSchema.parse(
+      (await admin.get("/api/v1/server-updates").expect(200)).body,
+    );
+    expect(fleet.servers.find((s) => s.serverId === serverId)!.updates).toMatchObject({
+      security: 1,
+    });
+    expect(fleet.topPackages[0]).toMatchObject({
+      name: "openssl-libs",
+      servers: 1,
+      severity: "Critical",
+    });
+    expect(fleet.totals).toMatchObject({ withSecurity: 1, rebootRequired: 1 });
+
+    const all = TenantFindingsSchema.parse(
+      (await admin.get("/api/v1/server-findings").expect(200)).body,
+    );
+    expect(all.items.filter((i) => i.serverId === serverId).map((i) => i.key)).toEqual([
+      "updates.security",
+      "updates.reboot_required",
+    ]);
+  });
+
+  it("an update finding can be accepted like any other", async () => {
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    await admin
+      .put(`/api/v1/servers/${serverId}/findings/updates.reboot_required/acceptance`)
+      .send({ reason: "Reboot scheduled for Saturday's window" })
+      .expect(200);
+    expect((await admin.get(`/api/v1/servers/${serverId}`)).body.findings).toEqual({
+      high: 1,
+      medium: 0,
+      low: 0,
+    });
+  });
+
+  it("an unavailable package manager is shown as such, never as up to date", async () => {
+    await report(
+      token,
+      inventory(machine(30), {
+        hostname: "app-02",
+        updates: updates({
+          status: "unavailable",
+          error: "Read-only file system",
+          pending: [],
+          rebootRequired: null,
+        }),
+      }),
+    ).expect(204);
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.updates).toMatchObject({ status: "unavailable" });
+    expect(detail.patchFindings).toEqual([]);
+    const fleet = FleetUpdatesSchema.parse(
+      (await admin.get("/api/v1/server-updates").expect(200)).body,
+    );
+    expect(fleet.totals.upToDate).toBe(0);
+  });
+
+  it("refuses oversized or malformed update reports", async () => {
+    await report(token, inventory(machine(30), { updates: updates({ status: "maybe" }) })).expect(
+      400,
+    );
+    await report(
+      token,
+      inventory(machine(30), {
+        updates: updates({ pending: Array.from({ length: 5001 }, () => updates().pending[1]) }),
+      }),
+    ).expect(400);
+  });
+
+  it("is invisible to other tenants", async () => {
+    const stranger = await signIn(t, other.tenantId, other.owner);
+    const fleet = FleetUpdatesSchema.parse(
+      (await stranger.get("/api/v1/server-updates").expect(200)).body,
+    );
+    expect(fleet.servers).toEqual([]);
+  });
+});
+
 describe("installer", () => {
   it("serves an install script that verifies the binary checksum", async () => {
     const res = await request(t.http).get("/api/agent/v1/install.sh").expect(200);
@@ -362,6 +504,7 @@ describe("installer", () => {
     expect(res.text).toContain(`SUM_amd64='${sum}'`);
     expect(res.text).toContain("checksum mismatch: refusing to install");
     expect(res.text).toContain("NoNewPrivileges=yes");
+    expect(res.text).toContain("ReadWritePaths=-/var/cache/dnf");
   });
 
   it("serves only known builds", async () => {

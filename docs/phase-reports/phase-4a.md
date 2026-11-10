@@ -42,13 +42,16 @@ a grant. Findings themselves aren't stored; they're computed from the latest rep
   under Accepted, and finds it in the audit log. Screenshots 18 and 19. All 11 E2E tests pass.
 - CI runs the real agent (`nf-agent once`) on its Ubuntu runner and validates the output, now
   including listeners, firewall and SSH, against the API contract.
+- **Verified on 2026-11-10 on the production host (Oracle Linux 9)** with `nf-agent once` under the
+  installed unit's sandbox (no capabilities, `ProtectSystem=strict`, restricted address
+  families). `firewall-cmd` answered over D-Bus, so firewalld rules were read (zone `public`,
+  10 allowed ranges). 55 listening sockets were reported with their users, and the SSH
+  settings were read. As expected, no process names were visible.
 
 ## Not claimed
 
-- The new collectors haven't run on a real server under the hardened systemd unit. In
-  particular, whether `firewall-cmd` answers a root process without capabilities over D-Bus is
-  expected but unverified. If it doesn't, the firewall shows as "rules not readable" (not as
-  "none"). The production VPS has no agent installed yet.
+- The agent isn't installed as a service on the production VPS yet. That needs an enrollment
+  key from the Admin Center.
 - The analysis sees the host firewall only. Cloud security groups, upstream firewalls and
   Docker-published ports are outside it, and the UI says so.
 - firewalld rich rules and ufw deny-before-allow ordering aren't evaluated.

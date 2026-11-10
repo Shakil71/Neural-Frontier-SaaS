@@ -54,7 +54,7 @@ Delivered in slices. **4a** turns the Linux agent's view of the network into fin
 
 | Pri | Item                                                                                     | Acceptance criteria                                  | Status                                                                             |
 | --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| P0  | Network exposure: listening ports, host firewall, SSH posture; findings; accept the risk | Parsers unit-tested; analysis unit-tested; API + E2E | 4a: built. firewalld collection under the hardened unit not yet run on a real host |
+| P0  | Network exposure: listening ports, host firewall, SSH posture; findings; accept the risk | Parsers unit-tested; analysis unit-tested; API + E2E | 4a: built and deployed; verified on the production host under the hardened sandbox |
 | P1  | Patch compliance: pending security updates per server                                    | Matches `dnf updateinfo` / `apt` on test hosts       | 4b                                                                                 |
 | P1  | Outside-in exposure check (connect from Neural Frontier to the server's addresses)       | Confirms or refutes each "reachable" finding         | 4b                                                                                 |
 | P2  | Cloud inventory (AWS/Azure/GCP), VPN and network devices                                 | Needs accounts to test against                       | Later                                                                              |

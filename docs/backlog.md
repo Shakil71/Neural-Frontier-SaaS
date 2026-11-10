@@ -48,6 +48,17 @@ the Admin Center (ADR 0010). The outline below keeps its numbering.
 | P1  | Outgoing email (own SMTP client): password reset, invitations                                   | Delivered through the host's mail relay         | 3b: built; tested against an in-suite SMTP server (plain, STARTTLS, TLS), not a real provider                                |
 | P1  | "Where you're signed in": list and end your own sessions                                        | Session revoked immediately                     | 3b: built                                                                                                                    |
 
+## Phase 4 — Infrastructure (formerly outline item 3)
+
+Delivered in slices. **4a** turns the Linux agent's view of the network into findings.
+
+| Pri | Item                                                                                     | Acceptance criteria                                  | Status                                                                             |
+| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| P0  | Network exposure: listening ports, host firewall, SSH posture; findings; accept the risk | Parsers unit-tested; analysis unit-tested; API + E2E | 4a: built. firewalld collection under the hardened unit not yet run on a real host |
+| P1  | Patch compliance: pending security updates per server                                    | Matches `dnf updateinfo` / `apt` on test hosts       | 4b                                                                                 |
+| P1  | Outside-in exposure check (connect from Neural Frontier to the server's addresses)       | Confirms or refutes each "reachable" finding         | 4b                                                                                 |
+| P2  | Cloud inventory (AWS/Azure/GCP), VPN and network devices                                 | Needs accounts to test against                       | Later                                                                              |
+
 ## Phase 3 – 10 (outline; detailed at each phase gate)
 
 3 Infrastructure, network, VPN, firewall, cloud inventory · 4 AI gateway and read-only agents with

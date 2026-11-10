@@ -20,6 +20,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.tenant_identity_provider
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.scim_tokens TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.agent_enrollment_keys TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.servers TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.server_finding_acceptances TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.local_credentials       TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.recovery_codes          TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.sign_in_links           TO 'nf_app'@'127.0.0.1';

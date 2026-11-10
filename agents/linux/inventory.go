@@ -19,6 +19,10 @@ type Inventory struct {
 	PackageManager string      `json:"packageManager"`
 	PackagesHash   string      `json:"packagesHash"`
 	PackageCount   int         `json:"packageCount"`
+	// Network exposure (agent 4a and later).
+	Listeners []Listener `json:"listeners"`
+	Firewall  Firewall   `json:"firewall"`
+	SSH       SSHConfig  `json:"ssh"`
 }
 
 type OSInfo struct {

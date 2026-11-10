@@ -264,6 +264,30 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
       packageManager: "rpm",
       packagesHash: "c".repeat(64),
       packageCount: 3,
+      // Network exposure: Redis on a public address with no firewall, SSH accepting passwords.
+      listeners: [
+        { proto: "tcp", address: "0.0.0.0", port: 22, user: "root", process: "sshd" },
+        { proto: "tcp", address: "0.0.0.0", port: 443, user: "root", process: "nginx" },
+        { proto: "tcp", address: "203.0.113.20", port: 6379, user: "redis", process: "" },
+        { proto: "tcp", address: "127.0.0.1", port: 3306, user: "mysql", process: "" },
+      ],
+      firewall: {
+        kind: "none",
+        active: false,
+        rulesKnown: false,
+        defaultAllow: false,
+        zones: [],
+        allowed: [],
+      },
+      ssh: {
+        present: true,
+        ports: [22],
+        permitRootLogin: "no",
+        passwordAuthentication: "yes",
+        kbdInteractiveAuthentication: "no",
+        usePam: "yes",
+        permitEmptyPasswords: "no",
+      },
     },
   });
   expect(report.status()).toBe(204);
@@ -279,6 +303,38 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
   await sheet.getByRole("tab", { name: /Packages/ }).click();
   await expect(sheet.getByText("openssl")).toBeVisible();
   await page.screenshot({ path: "test-results/screenshots/17-server-detail-light.png" });
+
+  // Exposure: the Security tab shows the analysis of the same report.
+  await sheet.getByRole("tab", { name: /Security/ }).click();
+  await expect(sheet.getByText("Redis (tcp/6379) is reachable from the internet")).toBeVisible();
+  await expect(sheet.getByText("No firewall is running")).toBeVisible();
+  await expect(sheet.getByText("SSH accepts passwords")).toBeVisible();
+  await expect(sheet.getByRole("cell", { name: /MySQL/ })).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/18-server-security-light.png" });
+  await page.keyboard.press("Escape");
+
+  // The banner leads to the organisation-wide Exposure page, where the risk is accepted.
+  await page.getByRole("link", { name: /high-severity findings? on 1 server/ }).click();
+  await expect(page).toHaveURL(/\/exposure$/);
+  await expect(page.getByRole("heading", { name: "Exposure" })).toBeVisible();
+  const redis = page
+    .getByRole("listitem")
+    .filter({ hasText: "Redis (tcp/6379) is reachable from the internet" });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: "test-results/screenshots/19-exposure-light.png", fullPage: true });
+  await redis.getByRole("button", { name: "Accept risk…" }).click();
+  const accept = page.getByRole("dialog", { name: "Accept this risk?" });
+  await accept
+    .getByLabel("Why is this acceptable?")
+    .fill("Upstream firewall allows only the app tier");
+  await accept.getByRole("button", { name: "Accept risk" }).click();
+  await expect(page.getByText("Finding accepted. It no longer counts as open.")).toBeVisible();
+  await page.getByRole("tab", { name: /Accepted/ }).click();
+  await expect(page.getByText("“Upstream firewall allows only the app tier”")).toBeVisible();
+
+  // Recorded in the audit log.
+  await page.goto("/audit");
+  await expect(page.getByRole("row", { name: "View Finding accepted event" })).toBeVisible();
 });
 
 /** RFC 6238 code, computed independently of the app (base32 seed → HMAC-SHA1). */

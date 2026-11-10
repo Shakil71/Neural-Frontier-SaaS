@@ -33,6 +33,7 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 | Passkeys / WebAuthn (needs a domain name)                                                                                   | Native     | ⬜ Phase 3c     |
 | Neural Frontier as an OIDC provider: "Sign in with Neural Frontier" for other apps                                          | Native     | ✅ Built (3c)   |
 | Retire Keycloak: readiness view, guarded switch script with undo                                                            | Native     | ✅ Built (3c-3) |
+| Network exposure: listening ports, host firewall and SSH analysis, findings with an accept-the-risk workflow                | Native     | ✅ Built (4a)   |
 | Linux inventory agent (Go) and Servers page                                                                                 | Native     | ✅ Built (2d)   |
 | Custom roles, ABAC conditions, JIT elevation, access reviews                                                                | Native     | ⬜ Phase 2–5    |
 | OAuth client credentials (service principals)                                                                               | Native     | ✅ Built (2a)   |

@@ -25,11 +25,14 @@ import {
   Search,
   Server,
   ServerOff,
+  ShieldAlert,
+  ShieldCheck,
   Terminal,
   Timer,
   Trash2,
   Workflow,
 } from "lucide-react";
+import Link from "next/link";
 import { Dialog as D } from "radix-ui";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -53,6 +56,7 @@ import { api, ApiRequestError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { usePermissions } from "@/lib/session";
+import { ExposurePanel, FindingsPill } from "./exposure";
 
 const keys = { servers: ["servers"] as const, enrollment: ["agent-enrollment-keys"] as const };
 const KeysSchema = z.object({
@@ -339,6 +343,11 @@ function ServerCard({ s, index, onOpen }: { s: ServerSummary; index: number; onO
         <p className="truncate text-[12.5px] text-muted">
           {s.os?.prettyName ?? "Waiting for first report"}
         </p>
+        {s.findings && (
+          <div className="mt-2.5">
+            <FindingsPill counts={s.findings} />
+          </div>
+        )}
         <div className="mt-4 grid gap-3">
           <Meter label="Memory" value={memoryUse(s)} />
           <Meter label="Fullest disk" value={s.diskPeak} />
@@ -367,12 +376,20 @@ function ServerCard({ s, index, onOpen }: { s: ServerSummary; index: number; onO
   );
 }
 
-type Tab = "overview" | "disks" | "network" | "services" | "packages";
+export type ServerTab = "overview" | "security" | "disks" | "network" | "services" | "packages";
 
-function ServerSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function ServerSheet({
+  id,
+  onClose,
+  initialTab = "overview",
+}: {
+  id: string | null;
+  onClose: () => void;
+  initialTab?: ServerTab;
+}) {
   const { can } = usePermissions();
   const client = useQueryClient();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<ServerTab>(initialTab);
   const [filter, setFilter] = useState("");
   const [retireOpen, setRetireOpen] = useState(false);
   const q = useDeferredValue(filter.trim().toLowerCase());
@@ -410,8 +427,12 @@ function ServerSheet({ id, onClose }: { id: string | null; onClose: () => void }
     [s, q],
   );
 
-  const tabs: { id: Tab; label: string; icon: typeof Server; count?: number }[] = [
+  const openFindings = s?.findings
+    ? s.findings.high + s.findings.medium + s.findings.low
+    : undefined;
+  const tabs: { id: ServerTab; label: string; icon: typeof Server; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Server },
+    { id: "security", label: "Security", icon: ShieldCheck, count: openFindings },
     { id: "disks", label: "Disks", icon: HardDrive, count: s?.disks.length },
     { id: "network", label: "Network", icon: Network, count: s?.interfaces.length },
     { id: "services", label: "Services", icon: Workflow, count: s?.services.length },
@@ -424,7 +445,7 @@ function ServerSheet({ id, onClose }: { id: string | null; onClose: () => void }
       onOpenChange={(o) => {
         if (!o) {
           onClose();
-          setTab("overview");
+          setTab(initialTab);
           setFilter("");
         }
       }}
@@ -547,6 +568,8 @@ function ServerSheet({ id, onClose }: { id: string | null; onClose: () => void }
                 )}
               </div>
             )}
+
+            {tab === "security" && <ExposurePanel s={s} canManage={can("servers.manage")} />}
 
             {tab === "disks" && (
               <ul className="space-y-2.5">
@@ -759,6 +782,8 @@ export function Servers() {
     attention: data.filter((s) => s.status === "stale" || s.status === "offline").length,
     full: data.filter((s) => (s.diskPeak ?? 0) >= 0.9 && s.status !== "retired").length,
   };
+  const high = data.reduce((n, s) => n + (s.findings?.high ?? 0), 0);
+  const highServers = data.filter((s) => (s.findings?.high ?? 0) > 0).length;
   const add = can("servers.manage") ? (
     <AddServer agentAvailable={meta.data?.agentAvailable ?? true} />
   ) : undefined;
@@ -791,6 +816,21 @@ export function Servers() {
         </Card>
       ) : (
         <>
+          {high > 0 && (
+            <Link
+              href="/exposure"
+              className="mb-4 flex items-center gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-[13px] transition-colors hover:border-danger/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/30"
+            >
+              <ShieldAlert className="size-4 shrink-0 text-danger" aria-hidden />
+              <span className="flex-1">
+                <span className="font-semibold">
+                  {high} high-severity {high === 1 ? "finding" : "findings"}
+                </span>{" "}
+                on {highServers} {highServers === 1 ? "server" : "servers"}
+              </span>
+              <span className="font-medium text-danger">Review exposure →</span>
+            </Link>
+          )}
           <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Servers", value: counts.total, tone: "text-foreground" },

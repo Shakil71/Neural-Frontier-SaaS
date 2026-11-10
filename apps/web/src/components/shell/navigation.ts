@@ -10,6 +10,7 @@ import {
   type LucideIcon,
   ScrollText,
   Server,
+  ShieldAlert,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -92,6 +93,13 @@ export const NAV: { group: string; items: NavItem[] }[] = [
         icon: Server,
         permission: "servers.read",
         keywords: "linux hosts machines agent inventory packages",
+      },
+      {
+        href: "/exposure",
+        label: "Exposure",
+        icon: ShieldAlert,
+        permission: "servers.read",
+        keywords: "security findings firewall ports ssh open network risk",
       },
     ],
   },

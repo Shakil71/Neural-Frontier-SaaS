@@ -7,8 +7,10 @@ import type {
   EnrollmentKey,
   IssuedEnrollmentKey,
   ServerDetail,
+  ServerFinding,
   ServerStatus,
   ServerSummary,
+  TenantFindings,
 } from "@nf/contracts";
 import { Prisma } from "@nf/db";
 import { z } from "zod";
@@ -17,6 +19,7 @@ import { AppError, Errors } from "../../common/errors.js";
 import type { Principal, RequestMeta } from "../../common/principal.js";
 import { DatabaseService } from "../../infra/database.service.js";
 import { AuditService } from "../audit/audit.service.js";
+import { analyseListeners, countOpen, findings, hasPublicAddress } from "./exposure.js";
 import type { CreateEnrollmentKeySchema } from "@nf/contracts";
 
 const DAY_MS = 86_400_000;
@@ -27,6 +30,7 @@ export type AgentArch = (typeof AGENT_ARCHES)[number];
 
 type ServerRow = Prisma.ServerGetPayload<object>;
 type KeyRow = Prisma.AgentEnrollmentKeyGetPayload<object>;
+type AcceptanceRow = Prisma.ServerFindingAcceptanceGetPayload<object>;
 
 /** The agent's stored inventory, minus packages (kept in their own column). */
 type StoredInventory = Omit<AgentInventory, "packages">;
@@ -74,8 +78,37 @@ export class ServersService {
     return "offline";
   }
 
-  private summary(r: ServerRow): ServerSummary {
+  /**
+   * Exposure analysis of the latest report, with accepted findings marked. Null when the agent
+   * predates exposure reporting (or hasn't reported yet).
+   */
+  private exposure(r: ServerRow, acceptances: AcceptanceRow[]) {
     const inv = (r.inventory ?? null) as StoredInventory | null;
+    if (!inv?.listeners || !inv.firewall || !inv.ssh) return null;
+    const listeners = analyseListeners(inv.listeners, inv.firewall);
+    const accepted = new Map(
+      acceptances.filter((a) => a.serverId === r.id).map((a) => [a.findingKey, a]),
+    );
+    const list: ServerFinding[] = findings({
+      listeners,
+      firewall: inv.firewall,
+      ssh: inv.ssh,
+      publicHost: hasPublicAddress(inv.interfaces.flatMap((i) => i.addresses)),
+    }).map((f) => {
+      const a = accepted.get(f.key);
+      return {
+        ...f,
+        accepted: a
+          ? { reason: a.reason, acceptedBy: a.acceptedBy, acceptedAt: a.acceptedAt.toISOString() }
+          : null,
+      };
+    });
+    return { listeners, firewall: inv.firewall, ssh: inv.ssh, findings: list };
+  }
+
+  private summary(r: ServerRow, acceptances: AcceptanceRow[]): ServerSummary {
+    const inv = (r.inventory ?? null) as StoredInventory | null;
+    const exposure = r.lifecycle === "active" ? this.exposure(r, acceptances) : null;
     const diskPeak = inv?.disks?.length
       ? Math.max(...inv.disks.map((d) => (d.sizeBytes > 0 ? d.usedBytes / d.sizeBytes : 0)))
       : null;
@@ -99,24 +132,38 @@ export class ServersService {
       agentVersion: r.agentVersion,
       lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
       enrolledAt: r.enrolledAt.toISOString(),
+      findings: exposure ? countOpen(exposure.findings) : null,
     };
   }
 
-  async list(tenantId: string): Promise<ServerSummary[]> {
-    const rows = await this.database.db.server.findMany({
-      where: { tenantId },
-      orderBy: [{ lifecycle: "asc" }, { hostname: "asc" }],
-      omit: { packages: true },
+  private acceptances(tenantId: string, serverId?: string) {
+    return this.database.db.serverFindingAcceptance.findMany({
+      where: { tenantId, ...(serverId ? { serverId } : {}) },
     });
-    return rows.map((r) => this.summary(r as ServerRow));
+  }
+
+  async list(tenantId: string): Promise<ServerSummary[]> {
+    const [rows, acceptances] = await Promise.all([
+      this.database.db.server.findMany({
+        where: { tenantId },
+        orderBy: [{ lifecycle: "asc" }, { hostname: "asc" }],
+        omit: { packages: true },
+      }),
+      this.acceptances(tenantId),
+    ]);
+    return rows.map((r) => this.summary(r as ServerRow, acceptances));
   }
 
   async get(tenantId: string, id: string): Promise<ServerDetail> {
-    const r = await this.database.db.server.findUnique({ where: { id, tenantId } });
+    const [r, acceptances] = await Promise.all([
+      this.database.db.server.findUnique({ where: { id, tenantId } }),
+      this.acceptances(tenantId, id),
+    ]);
     if (!r) throw Errors.notFound("Server");
     const inv = (r.inventory ?? null) as StoredInventory | null;
     return {
-      ...this.summary(r),
+      ...this.summary(r, acceptances),
+      exposure: r.lifecycle === "active" ? this.exposure(r, acceptances) : null,
       machineId: r.machineId,
       disks: inv?.disks ?? [],
       interfaces: inv?.interfaces ?? [],
@@ -124,6 +171,128 @@ export class ServersService {
       packages: Array.isArray(r.packages) ? (r.packages as ServerDetail["packages"]) : [],
       packageManager: inv?.packageManager ?? null,
     };
+  }
+
+  /** Findings across the organisation's active servers: open first, most severe first. */
+  async tenantFindings(tenantId: string): Promise<TenantFindings> {
+    const [rows, acceptances] = await Promise.all([
+      this.database.db.server.findMany({
+        where: { tenantId, lifecycle: "active" },
+        orderBy: { hostname: "asc" },
+        omit: { packages: true },
+      }),
+      this.acceptances(tenantId),
+    ]);
+    const items: TenantFindings["items"] = [];
+    let reporting = 0;
+    for (const r of rows) {
+      const e = this.exposure(r as ServerRow, acceptances);
+      if (!e) continue;
+      reporting++;
+      for (const f of e.findings) items.push({ ...f, serverId: r.id, hostname: r.hostname });
+    }
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    items.sort(
+      (a, b) =>
+        Number(a.accepted !== null) - Number(b.accepted !== null) ||
+        rank[a.severity] - rank[b.severity] ||
+        a.hostname.localeCompare(b.hostname) ||
+        a.key.localeCompare(b.key),
+    );
+    return {
+      items,
+      open: countOpen(items),
+      accepted: items.filter((i) => i.accepted).length,
+      serversReporting: reporting,
+      serversTotal: rows.length,
+    };
+  }
+
+  /**
+   * Records that an administrator accepts the risk of a finding. Only a finding the server has
+   * right now can be accepted, so a typo can't silence a future one.
+   */
+  async acceptFinding(
+    actor: Principal,
+    serverId: string,
+    key: string,
+    reason: string,
+    meta: RequestMeta,
+  ): Promise<ServerFinding> {
+    const tenantId = actor.tenantId;
+    return this.database.db.$transaction(async (tx) => {
+      const r = await tx.server.findUnique({
+        where: { id: serverId, tenantId },
+        omit: { packages: true },
+      });
+      if (!r || r.lifecycle !== "active") throw Errors.notFound("Server");
+      const current = this.exposure(r as ServerRow, [])?.findings.find((f) => f.key === key);
+      if (!current) throw Errors.notFound("Finding");
+      const row = await tx.serverFindingAcceptance.upsert({
+        where: { tenantId_serverId_findingKey: { tenantId, serverId, findingKey: key }, tenantId },
+        create: {
+          tenantId,
+          serverId,
+          findingKey: key,
+          reason,
+          acceptedById: actor.identityId,
+          acceptedBy: actor.email,
+        },
+        update: {
+          reason,
+          acceptedById: actor.identityId,
+          acceptedBy: actor.email,
+          acceptedAt: new Date(),
+        },
+      });
+      await this.audit.record(
+        {
+          tenantId,
+          action: "server.finding_accepted",
+          outcome: "success",
+          actor: { id: actor.identityId, label: actor.email },
+          target: { type: "server", id: serverId, label: r.hostname },
+          meta,
+          metadata: { finding: key, severity: current.severity, title: current.title, reason },
+        },
+        tx,
+      );
+      return {
+        ...current,
+        accepted: {
+          reason: row.reason,
+          acceptedBy: row.acceptedBy,
+          acceptedAt: row.acceptedAt.toISOString(),
+        },
+      };
+    });
+  }
+
+  async reopenFinding(actor: Principal, serverId: string, key: string, meta: RequestMeta) {
+    const tenantId = actor.tenantId;
+    await this.database.db.$transaction(async (tx) => {
+      const r = await tx.server.findUnique({
+        where: { id: serverId, tenantId },
+        select: { hostname: true },
+      });
+      if (!r) throw Errors.notFound("Server");
+      const removed = await tx.serverFindingAcceptance.deleteMany({
+        where: { tenantId, serverId, findingKey: key },
+      });
+      if (removed.count === 0) throw Errors.notFound("Accepted finding");
+      await this.audit.record(
+        {
+          tenantId,
+          action: "server.finding_reopened",
+          outcome: "success",
+          actor: { id: actor.identityId, label: actor.email },
+          target: { type: "server", id: serverId, label: r.hostname },
+          meta,
+          metadata: { finding: key },
+        },
+        tx,
+      );
+    });
   }
 
   /** Retiring revokes the agent credential at once; history stays in the audit log. */

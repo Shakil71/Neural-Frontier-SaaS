@@ -73,6 +73,7 @@ model Tenant {
   emailMessages           EmailMessage[]
   oauthApplications       OAuthApplication[]
   oauthCodes              OAuthAuthorizationCode[]
+  findingAcceptances      ServerFindingAcceptance[]
 
   @@map("tenants")
 }
@@ -574,7 +575,8 @@ model Server {
   updatedAt      DateTime        @updatedAt @db.DateTime(3)
   version        Int             @default(0)
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenant             Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  findingAcceptances ServerFindingAcceptance[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, machineId])
@@ -774,4 +776,24 @@ model OidcSigningKey {
   retiredAt        DateTime? @db.DateTime(3)
 
   @@map("oidc_signing_keys")
+}
+
+/// Phase 4a: an administrator accepted the risk of one exposure finding on one server (e.g.
+/// "port.exposed:tcp:3306"). Findings themselves are computed from the latest inventory; this
+/// only records the decision, so it reapplies if the finding disappears and comes back.
+model ServerFindingAcceptance {
+  id           String   @id @default(uuid(7)) @db.Char(36)
+  tenantId     String   @db.Char(36)
+  serverId     String   @db.Char(36)
+  findingKey   String   @db.VarChar(128)
+  reason       String   @db.VarChar(500)
+  acceptedById String   @db.Char(36)
+  acceptedBy   String   @db.VarChar(320)
+  acceptedAt   DateTime @default(now()) @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  server Server @relation(fields: [tenantId, serverId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, serverId, findingKey])
+  @@map("server_finding_acceptances")
 }

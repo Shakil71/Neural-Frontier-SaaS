@@ -30,6 +30,8 @@ export const AUDIT_ACTIONS = [
   "scim.token_revoked",
   "server.enrolled",
   "server.retired",
+  "server.finding_accepted",
+  "server.finding_reopened",
   "agent.enrollment_key_created",
   "agent.enrollment_key_revoked",
   "auth.password_set",

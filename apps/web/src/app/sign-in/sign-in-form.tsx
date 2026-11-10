@@ -1,6 +1,11 @@
 "use client";
 
-import { DiscoverSignInResponseSchema, SignInStepSchema, type TwoFactorSetup } from "@nf/contracts";
+import {
+  DiscoverSignInResponseSchema,
+  SignInOptionsSchema,
+  SignInStepSchema,
+  type TwoFactorSetup,
+} from "@nf/contracts";
 import {
   ArrowLeft,
   ArrowRight,
@@ -105,10 +110,19 @@ export function SignInForm({
   const [error, setError] = useState<string | null>(null);
   const [useRecovery, setUseRecovery] = useState(false);
   const focus = useRef<HTMLInputElement>(null);
+  // Whether a deployment-wide single sign-on provider exists (organisations with their own are
+  // still found by email). Unknown until loaded: the button stays hidden rather than flicker.
+  const [sharedSso, setSharedSso] = useState<boolean | null>(null);
 
   useEffect(() => {
     focus.current?.focus();
   }, [step.kind, useRecovery]);
+
+  useEffect(() => {
+    api("/api/v1/auth/options", { schema: SignInOptionsSchema })
+      .then((o) => setSharedSso(o.sharedSso))
+      .catch(() => setSharedSso(true));
+  }, []);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -143,6 +157,7 @@ export function SignInForm({
     e.preventDefault();
     const email = String(new FormData(e.currentTarget).get("email") ?? "").trim();
     if (!email) {
+      if (!sharedSso) return setError("Enter your work email.");
       goTo(ssoUrl(returnTo));
       setBusy(true);
       return;
@@ -208,30 +223,35 @@ export function SignInForm({
             aria-hidden
           />
         </PrimaryButton>
-        <div className="flex items-center gap-3 py-1 text-[11.5px] uppercase tracking-[0.14em] text-subtle">
-          <span className="h-px flex-1 bg-border" />
-          or
-          <span className="h-px flex-1 bg-border" />
-        </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={(e) => {
-            const email = String(
-              new FormData(e.currentTarget.form ?? undefined).get("email") ?? "",
-            ).trim();
-            setBusy(true);
-            goTo(ssoUrl(returnTo, email || undefined));
-          }}
-          className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-border-strong bg-surface/70 text-[14.5px] font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-70"
-        >
-          <Fingerprint className="size-[18px]" aria-hidden />
-          Continue with single sign-on
-        </button>
+        {sharedSso && (
+          <>
+            <div className="flex items-center gap-3 py-1 text-[11.5px] uppercase tracking-[0.14em] text-subtle">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={(e) => {
+                const email = String(
+                  new FormData(e.currentTarget.form ?? undefined).get("email") ?? "",
+                ).trim();
+                setBusy(true);
+                goTo(ssoUrl(returnTo, email || undefined));
+              }}
+              className="flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-border-strong bg-surface/70 text-[14.5px] font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-70"
+            >
+              <Fingerprint className="size-[18px]" aria-hidden />
+              Continue with single sign-on
+            </button>
+          </>
+        )}
         <p className="text-[12px] leading-relaxed text-subtle">
           Continue asks for your Neural Frontier password, or sends you to your organisation&apos;s
-          identity provider when it requires one. With single sign-on, an empty email uses this
-          deployment&apos;s default provider.
+          identity provider when it requires one.
+          {sharedSso &&
+            " With single sign-on, an empty email uses this deployment's default provider."}
         </p>
       </form>
     );

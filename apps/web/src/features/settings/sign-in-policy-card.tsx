@@ -4,10 +4,18 @@ import {
   MIN_PASSWORD_LENGTH_FLOOR,
   type SignInPolicy,
   SignInPolicySchema,
+  SignInReadinessSchema,
   type TwoFactorPolicy,
 } from "@nf/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Save, ShieldEllipsis, Smartphone } from "lucide-react";
+import {
+  CircleCheck,
+  KeyRound,
+  Save,
+  ShieldEllipsis,
+  Smartphone,
+  TriangleAlert,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { ErrorState } from "@/components/states/states";
@@ -252,6 +260,7 @@ export function SignInPolicyCard() {
         }
       />
       <CardBody>
+        <SignInReadiness />
         {policy.isPending && <Skeleton className="h-40" />}
         {policy.isError && (
           <ErrorState error={policy.error} onRetry={() => void policy.refetch()} />
@@ -260,5 +269,66 @@ export function SignInPolicyCard() {
         {p && <Editor key={p.version} policy={p} manage={can("tenant.sso.manage")} />}
       </CardBody>
     </Card>
+  );
+}
+
+function Meter({ label, value, total }: { label: string; value: number; total: number }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between text-[12.5px]">
+        <span className="text-muted">{label}</span>
+        <span className="font-medium tabular-nums">
+          {value} of {total}
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+        <div
+          className={cn("h-full rounded-full", pct === 100 ? "bg-success" : "bg-primary")}
+          style={{ width: `${Math.max(pct, value ? 4 : 0)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Who could still sign in without the deployment-wide provider (Keycloak on this server).
+ * Shown while that provider is configured, so the switch-over can be planned safely.
+ */
+export function SignInReadiness() {
+  const r = useQuery({
+    queryKey: ["tenant", "sign-in-readiness"],
+    queryFn: () =>
+      api("/api/v1/tenant/sign-in-policy/readiness", { schema: SignInReadinessSchema }),
+  });
+  const d = r.data;
+  if (!d || !d.sharedSsoConfigured) return null;
+  const ownersReady = d.owners > 0 && d.ownersWithPassword === d.owners;
+  return (
+    <div className="mb-5 space-y-3 rounded-xl border border-border bg-surface-sunken/50 p-4">
+      <div className="flex items-start gap-2.5">
+        {ownersReady || d.ownProvider ? (
+          <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+        ) : (
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+        )}
+        <div>
+          <p className="text-[13.5px] font-medium">Ready to sign in without the shared provider?</p>
+          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
+            {d.ownProvider
+              ? "Your organisation uses its own identity provider, so retiring the shared one doesn't affect you."
+              : ownersReady
+                ? "Every owner can sign in with a built-in password. People without one can get a link from their Sign-in panel."
+                : "Before this server's shared provider is retired, every owner should add a password in My account → Security & sign-in."}
+          </p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Meter label="Owners with a password" value={d.ownersWithPassword} total={d.owners} />
+        <Meter label="People with a password" value={d.withPassword} total={d.people} />
+        <Meter label="People with two-step sign-in" value={d.withTwoFactor} total={d.people} />
+      </div>
+    </div>
   );
 }

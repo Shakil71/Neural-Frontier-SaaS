@@ -220,3 +220,25 @@ export type IdentitySignInMethods = z.infer<typeof IdentitySignInMethodsSchema>;
 export const AdminCredentialActionSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
+
+// ---------- Moving off an external identity server ----------
+
+/** Public: what the sign-in screen should offer before an email is entered. */
+export const SignInOptionsSchema = z.object({
+  /** A deployment-wide single sign-on provider is configured. */
+  sharedSso: z.boolean(),
+});
+export type SignInOptions = z.infer<typeof SignInOptionsSchema>;
+
+/** Who can already sign in without the deployment-wide provider (e.g. Keycloak). */
+export const SignInReadinessSchema = z.object({
+  people: z.number().int(),
+  withPassword: z.number().int(),
+  withTwoFactor: z.number().int(),
+  owners: z.number().int(),
+  ownersWithPassword: z.number().int(),
+  sharedSsoConfigured: z.boolean(),
+  /** The organisation has its own identity provider (unaffected by retiring the shared one). */
+  ownProvider: z.boolean(),
+});
+export type SignInReadiness = z.infer<typeof SignInReadinessSchema>;

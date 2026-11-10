@@ -12,33 +12,33 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 
 ## Platform foundation
 
-| Capability                                                                                                                  | Delivery   | Status        |
-| --------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------- |
-| Multi-tenant data model with enforced isolation                                                                             | Native     | ✅ Built      |
-| OIDC single sign-on (any compliant IdP), PKCE                                                                               | Native     | ✅ Built      |
-| Per-tenant OIDC provider, email-first sign-in, enforcement                                                                  | Native     | ✅ Built (2b) |
-| Server-side sessions, idle/absolute expiry, revocation                                                                      | Native     | ✅ Built      |
-| RBAC with built-in roles, separation of duties                                                                              | Native     | ✅ Built      |
-| Append-only audit log (UI + API)                                                                                            | Native     | ✅ Built      |
-| Identity lifecycle: suspend / reactivate with reason                                                                        | Native     | ✅ Built      |
-| Role grant / revoke with idempotency and last-owner protection                                                              | Native     | ✅ Built      |
-| Live identity & access dashboard                                                                                            | Native     | ✅ Built      |
-| Health, readiness, Prometheus metrics, structured logs                                                                      | Native     | ✅ Built      |
-| OpenAPI document                                                                                                            | Native     | ✅ Built      |
-| SCIM 2.0 user provisioning (Entra ID, Okta)                                                                                 | Native     | ✅ Built (2c) |
-| SAML 2.0 SSO, SCIM groups                                                                                                   | Native     | ⬜ Phase 2    |
-| Built-in accounts: passwords, authenticator-app two-step sign-in, recovery codes, set-up/reset links, tenant sign-in policy | Native     | ✅ Built (3a) |
-| Email delivery (own SMTP client), "Forgot password?", emailed links                                                         | Native     | ✅ Built (3b) |
-| Sessions: list and end your own; admins sign people out everywhere                                                          | Native     | ✅ Built (3b) |
-| Passkeys / WebAuthn (needs a domain name)                                                                                   | Native     | ⬜ Phase 3c   |
-| Neural Frontier as an OIDC provider: "Sign in with Neural Frontier" for other apps                                          | Native     | ✅ Built (3c) |
-| Retire Keycloak (deployment sign-in fully built-in)                                                                         | Native     | ⬜ Phase 3c-3 |
-| Linux inventory agent (Go) and Servers page                                                                                 | Native     | ✅ Built (2d) |
-| Custom roles, ABAC conditions, JIT elevation, access reviews                                                                | Native     | ⬜ Phase 2–5  |
-| OAuth client credentials (service principals)                                                                               | Native     | ✅ Built (2a) |
-| Webhooks, Developer Portal                                                                                                  | Native     | ⬜ Phase 9    |
-| OpenTelemetry tracing export                                                                                                | OSS (OTel) | ⬜ Phase 3    |
-| Background jobs: retries, dead-letter, per-tenant fairness                                                                  | Native     | ✅ Built (2a) |
+| Capability                                                                                                                  | Delivery   | Status          |
+| --------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------- |
+| Multi-tenant data model with enforced isolation                                                                             | Native     | ✅ Built        |
+| OIDC single sign-on (any compliant IdP), PKCE                                                                               | Native     | ✅ Built        |
+| Per-tenant OIDC provider, email-first sign-in, enforcement                                                                  | Native     | ✅ Built (2b)   |
+| Server-side sessions, idle/absolute expiry, revocation                                                                      | Native     | ✅ Built        |
+| RBAC with built-in roles, separation of duties                                                                              | Native     | ✅ Built        |
+| Append-only audit log (UI + API)                                                                                            | Native     | ✅ Built        |
+| Identity lifecycle: suspend / reactivate with reason                                                                        | Native     | ✅ Built        |
+| Role grant / revoke with idempotency and last-owner protection                                                              | Native     | ✅ Built        |
+| Live identity & access dashboard                                                                                            | Native     | ✅ Built        |
+| Health, readiness, Prometheus metrics, structured logs                                                                      | Native     | ✅ Built        |
+| OpenAPI document                                                                                                            | Native     | ✅ Built        |
+| SCIM 2.0 user provisioning (Entra ID, Okta)                                                                                 | Native     | ✅ Built (2c)   |
+| SAML 2.0 SSO, SCIM groups                                                                                                   | Native     | ⬜ Phase 2      |
+| Built-in accounts: passwords, authenticator-app two-step sign-in, recovery codes, set-up/reset links, tenant sign-in policy | Native     | ✅ Built (3a)   |
+| Email delivery (own SMTP client), "Forgot password?", emailed links                                                         | Native     | ✅ Built (3b)   |
+| Sessions: list and end your own; admins sign people out everywhere                                                          | Native     | ✅ Built (3b)   |
+| Passkeys / WebAuthn (needs a domain name)                                                                                   | Native     | ⬜ Phase 3c     |
+| Neural Frontier as an OIDC provider: "Sign in with Neural Frontier" for other apps                                          | Native     | ✅ Built (3c)   |
+| Retire Keycloak: readiness view, guarded switch script with undo                                                            | Native     | ✅ Built (3c-3) |
+| Linux inventory agent (Go) and Servers page                                                                                 | Native     | ✅ Built (2d)   |
+| Custom roles, ABAC conditions, JIT elevation, access reviews                                                                | Native     | ⬜ Phase 2–5    |
+| OAuth client credentials (service principals)                                                                               | Native     | ✅ Built (2a)   |
+| Webhooks, Developer Portal                                                                                                  | Native     | ⬜ Phase 9      |
+| OpenTelemetry tracing export                                                                                                | OSS (OTel) | ⬜ Phase 3      |
+| Background jobs: retries, dead-letter, per-tenant fairness                                                                  | Native     | ✅ Built (2a)   |
 
 ## Frontier Identity
 

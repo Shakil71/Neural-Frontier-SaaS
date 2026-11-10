@@ -832,6 +832,20 @@
         ]
       }
     },
+    "/api/v1/auth/options": {
+      "get": {
+        "operationId": "SignInController_options",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/discover": {
       "post": {
         "operationId": "SignInController_discover",
@@ -1130,6 +1144,20 @@
       },
       "put": {
         "operationId": "SignInPolicyController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenant/sign-in-policy/readiness": {
+      "get": {
+        "operationId": "SignInPolicyController_readiness",
         "parameters": [],
         "responses": {
           "200": {

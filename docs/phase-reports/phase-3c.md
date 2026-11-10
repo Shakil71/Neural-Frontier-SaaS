@@ -55,3 +55,21 @@ account, including two-step sign-in, and the organisation decides who may use ea
 - **Keycloak is still in use** for this deployment's own single sign-on. Retiring it is the next
   step (3c-3).
 - **Passkeys still need a domain name** (3c-2).
+
+## 3c-3: retiring Keycloak
+
+| Area                          | Delivered                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Readiness in the Admin Center | Organisation → Built-in sign-in shows, while a shared provider is configured, how many owners, people and two-step users can already sign in without it, with plain advice.                                                                                                                                                                          |
+| Sign-in screen                | `GET /api/v1/auth/options` says whether shared single sign-on exists. Without it, the "Continue with single sign-on" button disappears and an empty email is refused with a clear message. Organisations with their own provider are still found by email.                                                                                           |
+| `retire-keycloak.sh` (root)   | `--check` lists organisations that would be locked out (no own provider and no active owner with a password, or password sign-in turned off). Switching refuses while any would be. It then backs up `api.env`, clears `NF_OIDC_*`, restarts the API with a health check, and stops and disables Keycloak (data kept). `--undo` restores everything. |
+
+**Evidence:**
+
+- Integration tests cover the options endpoint and the readiness counts: they change when an
+  owner adds a password, and Members are refused.
+- The script's SQL was run against the real schema: it reported an organisation whose owner had
+  no password, and reported none once the organisation had its own provider.
+
+**Not done yet:** the switch hasn't been run on the production VPS. That needs your go-ahead
+after the owners have set passwords.

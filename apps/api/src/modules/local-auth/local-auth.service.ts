@@ -10,7 +10,9 @@ import {
   type Permission,
   type SignInLinkInfo,
   type SignInLinkPurpose,
+  type SignInOptions,
   type SignInPolicy,
+  type SignInReadiness,
   type TwoFactorSetup,
   type UpdateSignInPolicy,
   passwordProblems,
@@ -112,6 +114,48 @@ export class LocalAuthService {
       minPasswordLength: row?.minPasswordLength ?? DEFAULT_MIN_PASSWORD_LENGTH,
       version: row?.version ?? 0,
       updatedAt: iso(row?.updatedAt),
+    };
+  }
+
+  /** Public sign-in screen options. */
+  options(): SignInOptions {
+    return { sharedSso: this.oidc.configured };
+  }
+
+  /** How many people could still sign in if the deployment-wide provider went away. */
+  async readiness(tenantId: string): Promise<SignInReadiness> {
+    const db = this.database.db;
+    const active = { tenantId, status: "active" as const };
+    const ownerRole = await db.role.findUnique({
+      where: { tenantId_key: { tenantId, key: "owner" }, tenantId },
+      select: { id: true },
+    });
+    const ownerFilter = ownerRole
+      ? { roleAssignments: { some: { roleId: ownerRole.id } } }
+      : { id: "__none__" };
+    const [people, withPassword, withTwoFactor, owners, ownersWithPassword, own] =
+      await Promise.all([
+        db.identity.count({ where: active }),
+        db.identity.count({
+          where: { ...active, localCredential: { passwordHash: { not: null } } },
+        }),
+        db.identity.count({
+          where: { ...active, localCredential: { totpEnabledAt: { not: null } } },
+        }),
+        db.identity.count({ where: { ...active, ...ownerFilter } }),
+        db.identity.count({
+          where: { ...active, ...ownerFilter, localCredential: { passwordHash: { not: null } } },
+        }),
+        db.tenantIdentityProvider.findUnique({ where: { tenantId }, select: { id: true } }),
+      ]);
+    return {
+      people,
+      withPassword,
+      withTwoFactor,
+      owners,
+      ownersWithPassword,
+      sharedSsoConfigured: this.oidc.configured,
+      ownProvider: own !== null,
     };
   }
 

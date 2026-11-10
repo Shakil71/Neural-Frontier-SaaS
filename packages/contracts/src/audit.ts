@@ -32,6 +32,18 @@ export const AUDIT_ACTIONS = [
   "server.retired",
   "agent.enrollment_key_created",
   "agent.enrollment_key_revoked",
+  "auth.password_set",
+  "auth.password_changed",
+  "auth.two_factor_enabled",
+  "auth.two_factor_disabled",
+  "auth.two_factor_reset",
+  "auth.recovery_codes_regenerated",
+  "auth.recovery_code_used",
+  "auth.account_locked",
+  "auth.account_unlocked",
+  "auth.sign_in_link_created",
+  "auth.sign_in_link_used",
+  "tenant.sign_in_policy_changed",
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

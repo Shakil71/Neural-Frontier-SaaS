@@ -31,9 +31,22 @@ connector; **2b** covers the items that need external systems to test against.
 | P0  | Job system with retries, dead-letter, per-tenant fairness    | Chaos test: worker restart loses no jobs                    | 2a: on MySQL (ADR 0008); chaos and fairness tests                                         |
 | P0  | Windows AD connector (.NET 10 LTS service)                   | Multi-domain inventory over mTLS; signed releases           | 2b: needs a Windows domain to test against                                                |
 | P1  | SAML 2.0, SCIM 2.0 inbound provisioning                      | Conformance test suites pass                                | 2c: SCIM 2.0 Users built (Groups, SAML pending); external conformance suite not run       |
-| P1  | Linux agent (Go) inventory MVP                               | RHEL/OL/Ubuntu/Debian/Rocky/Alma                            | 2b                                                                                        |
+| P1  | Linux agent (Go) inventory MVP                               | RHEL/OL/Ubuntu/Debian/Rocky/Alma                            | 2d: built and deployed; parsers unit-tested, CI runs it on Ubuntu; other distros not run  |
 | P1  | ESLint import-boundary rules between modules                 | CI fails on cross-domain imports                            | 2b: built (contracts, db, web features, api modules)                                      |
 | P2  | OpenTelemetry traces to the host's Prometheus/Grafana stack  | Trace a request end to end                                  | 2b                                                                                        |
+
+## Phase 3 — Built-in identity (inserted 2026-11-10 at the owner's direction)
+
+Goal: Neural Frontier runs without a third-party identity server, and everything is managed in
+the Admin Center (ADR 0010). The outline below keeps its numbering.
+
+| Pri | Item                                                                                            | Acceptance criteria                             | Status    |
+| --- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------- |
+| P0  | Built-in accounts: password, TOTP two-step, recovery codes, links, policy, lockout, break-glass | Integration + E2E tests; audited                | 3a: built |
+| P0  | Neural Frontier as an OIDC provider; migrate sign-in off Keycloak and remove it                 | Existing users keep access; Keycloak stopped    | 3c        |
+| P1  | Passkeys (WebAuthn)                                                                             | Register and sign in on Chrome, Safari, Android | 3b        |
+| P1  | Outgoing email (own SMTP client): password reset, invitations                                   | Delivered through the host's mail relay         | 3b        |
+| P1  | "Where you're signed in": list and end your own sessions                                        | Session revoked immediately                     | 3b        |
 
 ## Phase 3 – 10 (outline; detailed at each phase gate)
 

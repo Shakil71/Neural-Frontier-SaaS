@@ -23,6 +23,7 @@ describe("loadConfig", () => {
       secure: true,
       sessionName: "__Host-nf_session",
       loginStateName: "__Host-nf_login",
+      challengeName: "__Host-nf_2fa",
     });
     expect(c.session.idleMs).toBe(30 * 60_000);
     expect(c.oidc).toBeNull();

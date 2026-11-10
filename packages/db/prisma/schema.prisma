@@ -65,6 +65,10 @@ model Tenant {
   scimTokens              ScimToken[]
   servers                 Server[]
   agentEnrollmentKeys     AgentEnrollmentKey[]
+  localCredentials        LocalCredential[]
+  recoveryCodes           RecoveryCode[]
+  signInLinks             SignInLink[]
+  signInPolicy            TenantSignInPolicy?
 
   @@map("tenants")
 }
@@ -84,27 +88,30 @@ model TenantDomain {
 }
 
 model Identity {
-  id           String         @id @default(uuid(7)) @db.Char(36)
-  tenantId     String         @db.Char(36)
-  email        String         @db.VarChar(320)
-  displayName  String         @db.VarChar(200)
-  status       IdentityStatus @default(active)
+  id             String         @id @default(uuid(7)) @db.Char(36)
+  tenantId       String         @db.Char(36)
+  email          String         @db.VarChar(320)
+  displayName    String         @db.VarChar(200)
+  status         IdentityStatus @default(active)
   /// OIDC issuer + subject are bound on first sign-in; later sign-ins match on them, not on email.
-  oidcIssuer   String?        @db.VarChar(512)
-  oidcSubject  String?        @db.VarChar(255)
+  oidcIssuer     String?        @db.VarChar(512)
+  oidcSubject    String?        @db.VarChar(255)
   /// SCIM `externalId` from the provisioning client (e.g. the Entra object id).
-  scimExternalId String?      @db.VarChar(255)
+  scimExternalId String?        @db.VarChar(255)
   /// True once a SCIM client created or claimed this identity: its lifecycle is driven from there.
-  scimManaged    Boolean      @default(false)
-  lastSignInAt DateTime?      @db.DateTime(3)
-  createdAt    DateTime       @default(now()) @db.DateTime(3)
-  updatedAt    DateTime       @updatedAt @db.DateTime(3)
-  version      Int            @default(0)
+  scimManaged    Boolean        @default(false)
+  lastSignInAt   DateTime?      @db.DateTime(3)
+  createdAt      DateTime       @default(now()) @db.DateTime(3)
+  updatedAt      DateTime       @updatedAt @db.DateTime(3)
+  version        Int            @default(0)
 
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   roleAssignments RoleAssignment[] @relation("assignee")
   grantsMade      RoleAssignment[] @relation("grantor")
   sessions        Session[]
+  localCredential LocalCredential?
+  recoveryCodes   RecoveryCode[]
+  signInLinks     SignInLink[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, email])
@@ -569,4 +576,86 @@ model Server {
   @@unique([tenantId, machineId])
   @@index([tenantId, hostname])
   @@map("servers")
+}
+
+/// Built-in sign-in (Phase 3a): a password and/or authenticator-app second factor for one
+/// identity. Secrets are never stored in the clear: the password as a scrypt hash, the TOTP
+/// seed sealed with NF_DATA_KEY (bound to the identity as AAD).
+model LocalCredential {
+  id                String    @id @default(uuid(7)) @db.Char(36)
+  tenantId          String    @db.Char(36)
+  identityId        String    @db.Char(36)
+  /// `scrypt$<logN>$<r>$<p>$<salt b64>$<hash b64>`
+  passwordHash      String?   @db.VarChar(255)
+  passwordUpdatedAt DateTime? @db.DateTime(3)
+  totpSecretSealed  Bytes?    @db.VarBinary(256)
+  totpEnabledAt     DateTime? @db.DateTime(3)
+  /// Enrolment in progress (self-service): becomes the secret once a code from it is confirmed.
+  totpPendingSealed Bytes?    @db.VarBinary(256)
+  totpPendingAt     DateTime? @db.DateTime(3)
+  /// Last accepted 30-second step: a code can never be used twice.
+  totpLastStep      Int?
+  failedAttempts    Int       @default(0)
+  lockedUntil       DateTime? @db.DateTime(3)
+  createdAt         DateTime  @default(now()) @db.DateTime(3)
+  updatedAt         DateTime  @updatedAt @db.DateTime(3)
+  version           Int       @default(0)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  identity Identity @relation(fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, identityId])
+  @@map("local_credentials")
+}
+
+/// One-time recovery codes for the second factor. Only SHA-256 hashes are stored.
+model RecoveryCode {
+  id         String    @id @default(uuid(7)) @db.Char(36)
+  tenantId   String    @db.Char(36)
+  identityId String    @db.Char(36)
+  codeHash   Bytes     @unique @db.Binary(32)
+  usedAt     DateTime? @db.DateTime(3)
+  createdAt  DateTime  @default(now()) @db.DateTime(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  identity Identity @relation(fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, identityId])
+  @@map("recovery_codes")
+}
+
+/// One-time link an administrator (or the operator break-glass command) issues so a person can
+/// set their first password (`setup`) or choose a new one (`reset`).
+model SignInLink {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  tenantId    String    @db.Char(36)
+  identityId  String    @db.Char(36)
+  tokenHash   Bytes     @unique @db.Binary(32)
+  purpose     String    @db.VarChar(16)
+  expiresAt   DateTime  @db.DateTime(3)
+  usedAt      DateTime? @db.DateTime(3)
+  revokedAt   DateTime? @db.DateTime(3)
+  createdById String?   @db.Char(36)
+  createdAt   DateTime  @default(now()) @db.DateTime(3)
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  identity Identity @relation(fields: [tenantId, identityId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, identityId])
+  @@map("sign_in_links")
+}
+
+/// How people in this tenant may sign in with built-in accounts. Absent row = defaults.
+model TenantSignInPolicy {
+  tenantId          String   @id @db.Char(36)
+  passwordSignIn    Boolean  @default(true)
+  /// "optional" | "required" — applies to built-in (password) sign-ins.
+  twoFactor         String   @default("optional") @db.VarChar(16)
+  minPasswordLength Int      @default(12)
+  updatedAt         DateTime @updatedAt @db.DateTime(3)
+  version           Int      @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_sign_in_policies")
 }

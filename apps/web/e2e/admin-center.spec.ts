@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { expect, type Page, test } from "@playwright/test";
 
 async function signInAs(page: Page, email: string) {
@@ -82,6 +83,7 @@ test("owner signs in, grants a role, and the change is audited", async ({ page }
 
 /** Captures every screen in both themes; CI uploads them as the `ui-screenshots` artifact. */
 test("visual tour (screenshots)", async ({ page }) => {
+  test.setTimeout(90_000); // 18 full-page screenshots
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/sign-in");
   await page.screenshot({ path: "test-results/screenshots/00-sign-in.png" });
@@ -275,6 +277,109 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
   await sheet.getByRole("tab", { name: /Packages/ }).click();
   await expect(sheet.getByText("openssl")).toBeVisible();
   await page.screenshot({ path: "test-results/screenshots/17-server-detail-light.png" });
+});
+
+/** RFC 6238 code, computed independently of the app (base32 seed → HMAC-SHA1). */
+function totp(base32: string, stepOffset = 0): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of base32.replace(/\s/g, ""))
+    bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000) + stepOffset));
+  const mac = createHmac("sha1", key).update(msg).digest();
+  const o = mac[19]! & 15;
+  return String((mac.readUInt32BE(o) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+test("built-in sign-in: a set-up link, a password, then two-step sign-in", async ({
+  page,
+  browser,
+}) => {
+  const PASSWORD = "amber-falcon-orchard-91";
+  // The owner issues Grace a one-time sign-in link.
+  await signInAs(page, "ada.owner@acme.example");
+  await page.getByRole("link", { name: "Identities" }).click();
+  await page.getByRole("row", { name: /Open Grace Analyst/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Grace Analyst" });
+  await sheet.getByRole("button", { name: /Create sign-in link|Send password reset link/ }).click();
+  const issue = page.getByRole("dialog", { name: /Create a sign-in link/ });
+  await issue.getByRole("button", { name: "Create link" }).click();
+  const share = page.getByRole("dialog", { name: "Share this link" });
+  const url = (await share.locator("code").textContent()) ?? "";
+  expect(url).toMatch(/\/sign-in\/setup#nfl_/);
+  await page.screenshot({ path: "test-results/screenshots/18-sign-in-link-light.png" });
+  await share.getByRole("button", { name: "Done" }).click();
+
+  // Grace, in her own browser, sets a password with the link.
+  const grace = await (await browser.newContext()).newPage();
+  await grace.goto(url);
+  await expect(
+    grace.getByRole("heading", { name: /Welcome, Grace|Choose a new password/ }),
+  ).toBeVisible();
+  await expect(grace).toHaveURL(/\/sign-in\/setup$/); // the token left the address bar
+  await grace.getByLabel("New password", { exact: true }).fill("password");
+  await expect(grace.getByText("Not a commonly used password")).toBeVisible();
+  await grace.getByLabel("New password", { exact: true }).fill(PASSWORD);
+  await grace.getByLabel("Confirm password").fill(PASSWORD);
+  await grace.screenshot({ path: "test-results/screenshots/19-set-password-dark.png" });
+  await grace.getByRole("button", { name: /Set password|Save new password/ }).click();
+  await expect(grace.getByRole("heading", { name: "Your password is set" })).toBeVisible();
+
+  // …and signs in with it.
+  await grace.getByRole("link", { name: "Continue to sign in" }).click();
+  await expect(grace.getByText("Your password is set. Sign in with it now.")).toBeVisible();
+  await grace.getByRole("button", { name: "Continue", exact: true }).click();
+  await grace.getByLabel("Password", { exact: true }).fill("not-her-password");
+  await grace.getByRole("button", { name: "Sign in" }).click();
+  await expect(grace.getByText("Incorrect email or password.")).toBeVisible();
+  await grace.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await grace.getByRole("button", { name: "Sign in" }).click();
+  await expect(grace).toHaveURL(/localhost:3400\/$/);
+
+  // Turns on two-step sign-in from My account.
+  await grace.getByRole("button", { name: "Account menu" }).click();
+  await grace.getByRole("menuitem", { name: "Security & sign-in" }).click();
+  await expect(grace.getByRole("heading", { name: "Security & sign-in" })).toBeVisible();
+  await expect(grace.getByText("Signed in with password")).toBeVisible();
+  await grace.getByRole("button", { name: "Set up authenticator app" }).click();
+  const setup = grace.getByRole("dialog", { name: "Set up two-step sign-in" });
+  await expect(setup.getByRole("img", { name: /QR code/ })).toBeVisible();
+  const secret = (await setup.locator("code").textContent()) ?? "";
+  await grace.screenshot({ path: "test-results/screenshots/20-two-step-setup-light.png" });
+  await setup.getByLabel("6-digit code").fill(totp(secret));
+  await setup.getByRole("button", { name: "Turn on" }).click();
+  const saved = grace.getByRole("dialog", { name: "Save your recovery codes" });
+  await expect(saved.locator("li")).toHaveCount(10);
+  await expect(saved.getByRole("button", { name: "Done" })).toBeDisabled();
+  await saved.getByLabel(/I've saved these codes/).check();
+  await saved.getByRole("button", { name: "Done" }).click();
+  await expect(grace.getByText("10 of 10")).toBeVisible();
+
+  // Next sign-in asks for the code (a later step: the one used to turn it on is spent).
+  await grace.getByRole("button", { name: "Account menu" }).click();
+  await grace.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(grace.getByText("You've been signed out.")).toBeVisible();
+  await grace.getByLabel("Work email").fill("grace.analyst@acme.example");
+  await grace.getByRole("button", { name: "Continue", exact: true }).click();
+  await grace.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await grace.getByRole("button", { name: "Sign in" }).click();
+  await expect(grace.getByText("Enter the code from your authenticator app")).toBeVisible();
+  await grace.screenshot({ path: "test-results/screenshots/21-two-step-sign-in-dark.png" });
+  await grace.getByLabel("Authentication code").fill(totp(secret, 1));
+  await grace.getByRole("button", { name: "Verify" }).click();
+  await expect(grace).toHaveURL(/localhost:3400\/$/);
+
+  // The owner sees it all in Grace's sign-in panel and the audit log.
+  await page.reload();
+  await page.getByRole("row", { name: /Open Grace Analyst/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Grace Analyst" }).getByText("On", { exact: true }),
+  ).toBeVisible();
+  await page.goto("/audit");
+  await expect(page.getByRole("row", { name: /Two-factor turned on/ }).first()).toBeVisible();
+  await grace.context().close();
 });
 
 // Runs last: it changes how the Acme tenant signs in.

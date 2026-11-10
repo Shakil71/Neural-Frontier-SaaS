@@ -24,6 +24,7 @@ import {
 import { api, ApiRequestError } from "@/lib/api";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { usePermissions } from "@/lib/session";
+import { SignInSection } from "./sign-in-section";
 
 const AssignmentsSchema = z.array(
   z.object({ id: z.string(), roleId: z.string(), createdAt: z.string(), reason: z.string() }),
@@ -353,7 +354,6 @@ export function IdentitySheet({
                       Suspended
                     </Badge>
                   )}
-                  <Badge tone="accent">SSO</Badge>
                   {i.source === "scim" && <Badge tone="primary">Managed by SCIM</Badge>}
                   {isSelf && <Badge>You</Badge>}
                 </div>
@@ -410,6 +410,8 @@ export function IdentitySheet({
                 </ul>
               )}
             </section>
+
+            <SignInSection identityId={i.id} isSelf={isSelf} />
 
             {can("identities.manage") && !isSelf && (
               <section className="rounded-xl border border-danger/25 bg-danger-soft/40 p-4">

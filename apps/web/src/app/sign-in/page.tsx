@@ -76,6 +76,8 @@ export default async function SignInPage({
     : null;
   // `state=signed-out` comes back from the identity provider after single sign-out.
   const signedOut = params.signedOut === "1" || params.state === "signed-out";
+  const initialEmail = typeof params.email === "string" ? params.email.slice(0, 320) : undefined;
+  const passwordSet = params.passwordSet === "1";
 
   return (
     <main className="dark relative grid min-h-dvh overflow-hidden bg-background text-foreground lg:grid-cols-[1.15fr_1fr]">
@@ -118,7 +120,7 @@ export default async function SignInPage({
 
           <h2 className="text-[28px] font-semibold tracking-[-0.025em]">Welcome back</h2>
           <p className="mt-2 text-[14.5px] leading-relaxed text-muted">
-            Sign in with your organisation&apos;s identity provider to open the Admin Center.
+            Sign in to the Admin Center with your work account.
           </p>
 
           {error && (
@@ -130,6 +132,14 @@ export default async function SignInPage({
               <span>{error}</span>
             </div>
           )}
+          {passwordSet && !error && (
+            <div
+              role="status"
+              className="mt-7 rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-[13px] text-foreground"
+            >
+              Your password is set. Sign in with it now.
+            </div>
+          )}
           {signedOut && !error && (
             <div
               role="status"
@@ -139,14 +149,14 @@ export default async function SignInPage({
             </div>
           )}
 
-          <SignInForm returnTo={returnTo} />
+          <SignInForm returnTo={returnTo} initialEmail={initialEmail} />
 
           <div className="mt-10 flex items-start gap-3 rounded-xl border border-border bg-surface/60 p-4 backdrop-blur">
             <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-success" aria-hidden />
             <p className="text-[12.5px] leading-relaxed text-muted">
-              Neural Frontier never sees your password. Authentication happens at your identity
-              provider using OpenID Connect with PKCE; sessions are bound to this browser and expire
-              automatically.
+              Passwords are stored only as salted scrypt hashes, two-step codes are checked on our
+              servers, and single sign-on uses OpenID Connect with PKCE. Sessions are bound to this
+              browser and expire automatically.
             </p>
           </div>
         </div>

@@ -831,6 +831,278 @@
           "servers"
         ]
       }
+    },
+    "/api/v1/auth/discover": {
+      "post": {
+        "operationId": "SignInController_discover",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "operationId": "SignInController_password",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/two-factor": {
+      "post": {
+        "operationId": "SignInController_twoFactor",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sign-in-links/inspect": {
+      "post": {
+        "operationId": "SignInController_inspectLink",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sign-in-links/redeem": {
+      "post": {
+        "operationId": "SignInController_redeemLink",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/me/security": {
+      "get": {
+        "operationId": "MySecurityController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/security/password": {
+      "put": {
+        "operationId": "MySecurityController_changePassword",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/security/two-factor/setup": {
+      "post": {
+        "operationId": "MySecurityController_setup",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/security/two-factor/enable": {
+      "post": {
+        "operationId": "MySecurityController_enable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/security/two-factor/disable": {
+      "post": {
+        "operationId": "MySecurityController_disable",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/security/recovery-codes": {
+      "post": {
+        "operationId": "MySecurityController_recoveryCodes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/sign-in": {
+      "get": {
+        "operationId": "IdentitySignInController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/sign-in/link": {
+      "post": {
+        "operationId": "IdentitySignInController_link",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/sign-in/reset-two-factor": {
+      "post": {
+        "operationId": "IdentitySignInController_resetTwoFactor",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/identities/{id}/sign-in/unlock": {
+      "post": {
+        "operationId": "IdentitySignInController_unlock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
+    "/api/v1/tenant/sign-in-policy": {
+      "get": {
+        "operationId": "SignInPolicyController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      },
+      "put": {
+        "operationId": "SignInPolicyController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
     }
   },
   "info": {

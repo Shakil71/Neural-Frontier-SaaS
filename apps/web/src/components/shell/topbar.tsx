@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut, Menu as MenuIcon, Monitor, Moon, Search, Sun } from "lucide-react";
+import { LogOut, Menu as MenuIcon, Monitor, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import Link from "next/link";
 import { useTheme } from "next-themes";
 import { Dialog as D } from "radix-ui";
 import { useState, useSyncExternalStore } from "react";
@@ -117,6 +118,13 @@ export function Topbar() {
                 <p className="truncate text-[13px] font-medium">{session.user.displayName}</p>
                 <p className="truncate text-[12px] text-subtle">{session.tenant.name}</p>
               </div>
+              <MenuSeparator />
+              <MenuItem asChild>
+                <Link href="/account/security">
+                  <ShieldCheck />
+                  Security &amp; sign-in
+                </Link>
+              </MenuItem>
               <MenuSeparator />
               <ThemeMenuItems />
               <MenuSeparator />

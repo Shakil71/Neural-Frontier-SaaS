@@ -7,6 +7,14 @@ import {
   CircleX,
   KeyRound,
   KeySquare,
+  LifeBuoy,
+  Link2,
+  ListRestart,
+  Lock,
+  LockOpen,
+  ShieldCheck,
+  ShieldEllipsis,
+  ShieldOff,
   RefreshCw,
   ServerCog,
   ServerOff,
@@ -88,6 +96,30 @@ export const AUDIT_LABELS: Record<
     icon: Trash2,
     tone: "warning",
   },
+  "auth.password_set": { label: "Password set", icon: KeyRound, tone: "primary" },
+  "auth.password_changed": { label: "Password changed", icon: KeyRound, tone: "warning" },
+  "auth.two_factor_enabled": { label: "Two-factor turned on", icon: ShieldCheck, tone: "primary" },
+  "auth.two_factor_disabled": { label: "Two-factor turned off", icon: ShieldOff, tone: "danger" },
+  "auth.two_factor_reset": {
+    label: "Two-factor reset by an admin",
+    icon: ShieldOff,
+    tone: "danger",
+  },
+  "auth.recovery_codes_regenerated": {
+    label: "Recovery codes replaced",
+    icon: ListRestart,
+    tone: "warning",
+  },
+  "auth.recovery_code_used": { label: "Recovery code used", icon: LifeBuoy, tone: "warning" },
+  "auth.account_locked": { label: "Account locked", icon: Lock, tone: "danger" },
+  "auth.account_unlocked": { label: "Account unlocked", icon: LockOpen, tone: "warning" },
+  "auth.sign_in_link_created": { label: "Sign-in link issued", icon: Link2, tone: "warning" },
+  "auth.sign_in_link_used": { label: "Sign-in link used", icon: Link2, tone: "neutral" },
+  "tenant.sign_in_policy_changed": {
+    label: "Sign-in policy changed",
+    icon: ShieldEllipsis,
+    tone: "warning",
+  },
 };
 
 export function auditLabel(action: string) {
@@ -120,4 +152,6 @@ export const SIGN_IN_ERRORS: Record<string, string> = {
     "Your organisation's identity provider can only sign you in to your own organisation. Check the email address you entered.",
   tenant_idp_required:
     "Your organisation requires its own sign-in provider. Enter your work email above to be sent there.",
+  password_sign_in_disabled:
+    "Your organisation signs in through its identity provider only. Use single sign-on.",
 };

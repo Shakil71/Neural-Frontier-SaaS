@@ -19,6 +19,8 @@ export const PERMISSIONS = {
   "connectors.sync": "Start a directory sync",
   "service_principals.read": "View service principals (machine identities)",
   "service_principals.manage": "Create service principals and issue or revoke their secrets",
+  "servers.read": "View Linux servers and their inventory",
+  "servers.manage": "Enrol and retire servers and manage agent enrollment keys",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -43,6 +45,7 @@ export const MACHINE_PERMISSIONS = [
   "directory.read",
   "connectors.read",
   "connectors.sync",
+  "servers.read",
 ] as const satisfies readonly Permission[];
 
 export type MachinePermission = (typeof MACHINE_PERMISSIONS)[number];
@@ -74,6 +77,8 @@ export const BUILT_IN_ROLES = {
       "connectors.manage",
       "connectors.sync",
       "service_principals.read",
+      "servers.read",
+      "servers.manage",
     ],
   },
   security_auditor: {
@@ -87,6 +92,7 @@ export const BUILT_IN_ROLES = {
       "directory.read",
       "connectors.read",
       "service_principals.read",
+      "servers.read",
     ],
   },
   member: {

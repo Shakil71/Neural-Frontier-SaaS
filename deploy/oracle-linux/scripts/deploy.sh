@@ -36,6 +36,17 @@ MIGRATE_PW=$(env_get "$CONF_DIR/migrate.env" NF_MIGRATE_DB_PASSWORD)
 (cd "$SRC/packages/db" && DATABASE_URL="$MIGRATE_URL" npx --no-install prisma migrate deploy)
 MYSQL_PWD="$MIGRATE_PW" mysql --protocol=tcp -h 127.0.0.1 -u nf_migrate "$DB_NAME" <"$SRC/deploy/oracle-linux/mysql/grants.sql"
 
+log "agent build"
+if command -v go >/dev/null; then
+  mkdir -p "$SRC/agent-dist"
+  for arch in amd64 arm64; do
+    (cd "$SRC/agents/linux" && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+      go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_ID}" -o "$SRC/agent-dist/nf-agent-linux-$arch" .)
+  done
+else
+  log "go is not installed: the release ships without the Linux agent (run install.sh)"
+fi
+
 log "staging release $RELEASE_ID"
 # Prune in the (disposable) build workspace, where every workspace exists; the next CI run
 # starts from a fresh `npm ci`.

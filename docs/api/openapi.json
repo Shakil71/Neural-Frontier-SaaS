@@ -724,6 +724,113 @@
           "scim"
         ]
       }
+    },
+    "/api/v1/servers": {
+      "get": {
+        "operationId": "ServersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
+    },
+    "/api/v1/servers/{id}": {
+      "get": {
+        "operationId": "ServersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      },
+      "delete": {
+        "operationId": "ServersController_retire",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
+    },
+    "/api/v1/agent-enrollment-keys": {
+      "get": {
+        "operationId": "ServersController_keys",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      },
+      "post": {
+        "operationId": "ServersController_createKey",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
+    },
+    "/api/v1/agent-enrollment-keys/{id}": {
+      "delete": {
+        "operationId": "ServersController_revokeKey",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
     }
   },
   "info": {

@@ -13,3 +13,7 @@ test-results/
 !.env.example
 npm-debug.log*
 .DS_Store
+
+# Linux agent builds
+agents/linux/dist/
+agent-dist/

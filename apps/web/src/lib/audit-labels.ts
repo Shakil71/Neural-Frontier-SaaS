@@ -8,6 +8,8 @@ import {
   KeyRound,
   KeySquare,
   RefreshCw,
+  ServerCog,
+  ServerOff,
   Trash2,
   Unplug,
   LogIn,
@@ -74,6 +76,18 @@ export const AUDIT_LABELS: Record<
   },
   "scim.token_created": { label: "Provisioning token issued", icon: KeySquare, tone: "warning" },
   "scim.token_revoked": { label: "Provisioning token revoked", icon: Trash2, tone: "warning" },
+  "server.enrolled": { label: "Server enrolled", icon: ServerCog, tone: "primary" },
+  "server.retired": { label: "Server retired", icon: ServerOff, tone: "warning" },
+  "agent.enrollment_key_created": {
+    label: "Enrollment key issued",
+    icon: KeySquare,
+    tone: "warning",
+  },
+  "agent.enrollment_key_revoked": {
+    label: "Enrollment key revoked",
+    icon: Trash2,
+    tone: "warning",
+  },
 };
 
 export function auditLabel(action: string) {

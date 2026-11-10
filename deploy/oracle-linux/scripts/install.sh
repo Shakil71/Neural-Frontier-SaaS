@@ -31,6 +31,8 @@ command -v node >/dev/null || die "node is not installed"
 node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=12)?0:1)' \
   || die "Node.js >= 22.12 required (found $(node -v))"
 command -v rsync >/dev/null || dnf -y -q install rsync
+# Go builds the Linux agent during deploys (Oracle Linux AppStream package).
+command -v go >/dev/null || dnf -y -q install golang
 for bin in mysql mysqldump redis-cli nginx openssl semanage firewall-cmd rsync; do
   command -v "$bin" >/dev/null || die "missing required tool: $bin"
 done
@@ -95,6 +97,9 @@ if [[ ! -f "$CONF_DIR/api.env" ]]; then
       "$KIT/env/api.env.example" >"$CONF_DIR/api.env"
 fi
 # Keys added after the first install are appended, never overwritten.
+# Agents pin this certificate while it is self-signed.
+grep -q '^NF_TLS_CERT_FILE=' "$CONF_DIR/api.env" \
+  || printf 'NF_TLS_CERT_FILE=%s\n' /etc/pki/tls/neural-frontier/selfsigned.crt >>"$CONF_DIR/api.env"
 if ! grep -q '^NF_DATA_KEY=.' "$CONF_DIR/api.env"; then
   sed -i '/^NF_DATA_KEY=/d' "$CONF_DIR/api.env"
   printf 'NF_DATA_KEY=%s\n' "$DATA_KEY" >>"$CONF_DIR/api.env"

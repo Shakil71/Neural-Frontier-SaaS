@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { z } from "zod";
 
 const bool = (def: boolean) =>
@@ -63,6 +64,11 @@ const EnvSchema = z
     NF_WORKER_TENANT_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(2),
     NF_WORKER_POLL_MS: z.coerce.number().int().min(50).max(60_000).default(2000),
     NF_JOB_LEASE_SECONDS: z.coerce.number().int().min(5).max(3600).default(120),
+    /** Directory holding nf-agent-linux-{amd64,arm64} (built by deploy.sh). */
+    NF_AGENT_DIST_DIR: z.string().optional(),
+    /** PEM certificate served by Nginx; its SHA-256 is pinned by agents when self-signed. */
+    NF_TLS_CERT_FILE: z.string().optional(),
+    NF_AGENT_INTERVAL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(300),
   })
   .superRefine((env, ctx) => {
     const prod = env.NODE_ENV === "production";
@@ -122,6 +128,7 @@ export interface AppConfig {
   roleSyncOnStart: boolean;
   /** Allow http:// OIDC issuers (development and tests only; refused in production). */
   oidcAllowInsecureHttp: boolean;
+  agent: { distDir: string; tlsCertFile: string | null; intervalSeconds: number };
   /** Null outside production when NF_DATA_KEY is unset; connectors are then unavailable. */
   dataKey: Buffer | null;
   graph: { authorityUrl: string; apiUrl: string };
@@ -185,6 +192,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     apiDocs: e.NF_API_DOCS,
     roleSyncOnStart: e.NF_ROLE_SYNC_ON_START,
     oidcAllowInsecureHttp: e.NF_OIDC_ALLOW_INSECURE_HTTP,
+    agent: {
+      distDir: e.NF_AGENT_DIST_DIR ?? resolve(process.cwd(), "../../agent-dist"),
+      tlsCertFile: e.NF_TLS_CERT_FILE ?? null,
+      intervalSeconds: e.NF_AGENT_INTERVAL_SECONDS,
+    },
     dataKey: e.NF_DATA_KEY ? Buffer.from(e.NF_DATA_KEY, "base64") : null,
     graph: {
       authorityUrl: e.NF_GRAPH_AUTHORITY_URL.replace(/\/+$/, ""),

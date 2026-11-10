@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   ScrollText,
+  Server,
   ShieldCheck,
   Users,
 } from "lucide-react";
@@ -70,6 +71,18 @@ export const NAV: { group: string; items: NavItem[] }[] = [
         icon: Cable,
         permission: "connectors.read",
         keywords: "microsoft graph entra sync integration",
+      },
+    ],
+  },
+  {
+    group: "Infrastructure",
+    items: [
+      {
+        href: "/servers",
+        label: "Servers",
+        icon: Server,
+        permission: "servers.read",
+        keywords: "linux hosts machines agent inventory packages",
       },
     ],
   },

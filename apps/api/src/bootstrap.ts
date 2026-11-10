@@ -27,7 +27,8 @@ export async function createApp(config: AppConfig, opts: { bufferLogs?: boolean 
   app.use(cookieParser());
   // SCIM clients send application/scim+json.
   app.useBodyParser("json", {
-    limit: "256kb",
+    // Agent inventory reports carry package lists; Nginx caps bodies at 1 MB as well.
+    limit: "1mb",
     type: ["application/json", "application/scim+json"],
   });
   // The OAuth token endpoint accepts form-encoded requests (RFC 6749).

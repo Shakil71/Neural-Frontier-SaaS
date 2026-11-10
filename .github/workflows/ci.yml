@@ -171,14 +171,48 @@ jobs:
           format: cyclonedx-json
           artifact-name: sbom.cyclonedx.json
 
+  agent:
+    name: Linux agent (Go vet, tests, build, real inventory vs contract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: agents/linux/go.mod
+          cache: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: gofmt
+        working-directory: agents/linux
+        run: test -z "$(gofmt -l .)" || { gofmt -d .; echo "::error::run gofmt"; exit 1; }
+      - name: go vet and tests
+        working-directory: agents/linux
+        run: go vet ./... && go test -race -count=1 ./...
+      - name: Build static binaries (amd64, arm64)
+        working-directory: agents/linux
+        run: |
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=ci-${GITHUB_SHA::12}" -o "dist/nf-agent-linux-$arch" .
+          done
+          ls -l dist
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Real inventory from this runner matches the API contract
+        run: |
+          agents/linux/dist/nf-agent-linux-amd64 once > inventory.json
+          node tools/validate-inventory.mjs inventory.json
+
   # Single required status check for branch protection and for deploy.yml.
   ci-passed:
     name: CI passed
     if: always()
-    needs: [quality, integration, e2e, supply-chain]
+    needs: [quality, integration, e2e, supply-chain, agent]
     runs-on: ubuntu-latest
     steps:
       - run: |
           [[ "${{ needs.quality.result }}" == success && "${{ needs.integration.result }}" == success && \
-             "${{ needs.e2e.result }}" == success && "${{ needs.supply-chain.result }}" == success ]] \
+             "${{ needs.e2e.result }}" == success && "${{ needs.supply-chain.result }}" == success && "${{ needs.agent.result }}" == success ]] \
             || { echo "::error::A required CI job failed"; exit 1; }

@@ -28,6 +28,10 @@ export const AUDIT_ACTIONS = [
   "tenant.idp_enforcement_changed",
   "scim.token_created",
   "scim.token_revoked",
+  "server.enrolled",
+  "server.retired",
+  "agent.enrollment_key_created",
+  "agent.enrollment_key_revoked",
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

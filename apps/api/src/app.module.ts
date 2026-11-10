@@ -40,6 +40,12 @@ import {
   ScimTokensService,
 } from "./modules/scim/scim-tokens.js";
 import { ScimUsersService } from "./modules/scim/scim-users.service.js";
+import {
+  AgentController,
+  AgentGuard,
+  ServersController,
+} from "./modules/servers/servers.controller.js";
+import { ServersService } from "./modules/servers/servers.service.js";
 import { RoleCatalogSync } from "./modules/authz/role-catalog-sync.js";
 import { BearerResolver } from "./modules/auth/security.guard.js";
 import { ConnectorsController } from "./modules/connectors/connectors.controller.js";
@@ -117,6 +123,8 @@ export class AppModule implements NestModule {
         OAuthController,
         ScimTokensController,
         ScimController,
+        ServersController,
+        AgentController,
       ],
       providers: [
         AuditService,
@@ -138,6 +146,8 @@ export class AppModule implements NestModule {
         ScimTokensService,
         ScimUsersService,
         ScimAuthGuard,
+        ServersService,
+        AgentGuard,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

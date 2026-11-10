@@ -63,6 +63,8 @@ model Tenant {
   servicePrincipalSecrets ServicePrincipalSecret[]
   identityProvider        TenantIdentityProvider?
   scimTokens              ScimToken[]
+  servers                 Server[]
+  agentEnrollmentKeys     AgentEnrollmentKey[]
 
   @@map("tenants")
 }
@@ -511,4 +513,60 @@ model ScimToken {
 
   @@index([tenantId])
   @@map("scim_tokens")
+}
+
+// ───────────── Phase 2d: Linux server agent ─────────────
+
+enum ServerLifecycle {
+  active
+  retired
+}
+
+/// Lets a new server enrol its agent. Shown once; only its SHA-256 is stored.
+model AgentEnrollmentKey {
+  id          String    @id @default(uuid(7)) @db.Char(36)
+  tenantId    String    @db.Char(36)
+  name        String    @db.VarChar(120)
+  keyHash     Bytes     @unique @db.Binary(32)
+  hint        String    @db.VarChar(8)
+  uses        Int       @default(0)
+  maxUses     Int?
+  expiresAt   DateTime  @db.DateTime(3)
+  revokedAt   DateTime? @db.DateTime(3)
+  createdById String?   @db.Char(36)
+  createdAt   DateTime  @default(now()) @db.DateTime(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@map("agent_enrollment_keys")
+}
+
+/// A Linux server reporting through the agent. Inventory is the latest snapshot.
+model Server {
+  id             String          @id @default(uuid(7)) @db.Char(36)
+  tenantId       String          @db.Char(36)
+  hostname       String          @db.VarChar(253)
+  /// /etc/machine-id: stable across reboots and hostname changes.
+  machineId      String          @db.Char(32)
+  lifecycle      ServerLifecycle @default(active)
+  /// SHA-256 of the agent's bearer token; replaced on re-enrolment, cleared on retirement.
+  agentTokenHash Bytes?          @unique @db.Binary(32)
+  agentVersion   String?         @db.VarChar(64)
+  enrolledViaKey String?         @db.Char(36)
+  inventory      Json?
+  packages       Json?
+  packagesHash   String?         @db.VarChar(64)
+  packageCount   Int             @default(0)
+  lastSeenAt     DateTime?       @db.DateTime(3)
+  enrolledAt     DateTime        @default(now()) @db.DateTime(3)
+  updatedAt      DateTime        @updatedAt @db.DateTime(3)
+  version        Int             @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, machineId])
+  @@index([tenantId, hostname])
+  @@map("servers")
 }

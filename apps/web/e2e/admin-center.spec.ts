@@ -178,6 +178,103 @@ test("signing out also ends the identity provider session (single sign-out)", as
   await expect(page.locator('input[name="login"]')).toBeVisible();
 });
 
+test("an administrator adds a server; the agent's report appears in the Admin Center", async ({
+  page,
+  request,
+}) => {
+  await signInAs(page, "ada.owner@acme.example");
+  await page.goto("/servers");
+  await page.getByRole("button", { name: "Add server" }).first().click();
+  await page
+    .getByRole("dialog", { name: "Add a Linux server" })
+    .getByRole("button", { name: "Create key" })
+    .click();
+  const done = page.getByRole("dialog", { name: "Run this on the server" });
+  const command = (await done.locator("code").textContent()) ?? "";
+  const key = /--key (nfe_[A-Za-z0-9_-]+)/.exec(command)?.[1] ?? "";
+  expect(key).not.toBe("");
+  await page.screenshot({ path: "test-results/screenshots/15-add-server-light.png" });
+  await done.getByRole("button", { name: "Done" }).click();
+
+  // What the agent does: enrol with the key, then report inventory with its own token.
+  const machineId = "e2e0000000000000000000000000a001";
+  const enrolled = await request.post("/api/agent/v1/enroll", {
+    data: { enrollmentKey: key, machineId, hostname: "app-01" },
+  });
+  expect(enrolled.status()).toBe(200);
+  const { agentToken } = (await enrolled.json()) as { agentToken: string };
+  const report = await request.post("/api/agent/v1/inventory", {
+    headers: { Authorization: `Bearer ${agentToken}` },
+    data: {
+      agentVersion: "e2e",
+      collectedAt: new Date().toISOString(),
+      hostname: "app-01.acme.example",
+      machineId,
+      os: {
+        id: "ol",
+        name: "Oracle Linux Server",
+        version: "9.8",
+        prettyName: "Oracle Linux Server 9.8",
+        kernel: "5.15.0-300.el9uek.x86_64",
+        arch: "amd64",
+      },
+      cpu: { model: "AMD EPYC 7763 64-Core Processor", cores: 8 },
+      memory: { totalBytes: 34359738368, availableBytes: 21474836480 },
+      uptimeSeconds: 1_209_600,
+      loadAverage: [0.62, 0.48, 0.41],
+      disks: [
+        {
+          mount: "/",
+          device: "/dev/mapper/ol-root",
+          fsType: "xfs",
+          sizeBytes: 107374182400,
+          usedBytes: 41875931136,
+        },
+        {
+          mount: "/data",
+          device: "/dev/sdb1",
+          fsType: "xfs",
+          sizeBytes: 536870912000,
+          usedBytes: 498216206336,
+        },
+      ],
+      interfaces: [
+        {
+          name: "ens192",
+          mac: "00:50:56:a1:b2:c3",
+          addresses: ["10.20.0.15/24", "fe80::250:56ff:fea1:b2c3/64"],
+        },
+      ],
+      services: [
+        { name: "nginx.service", description: "The nginx HTTP and reverse proxy server" },
+        { name: "sshd.service", description: "OpenSSH server daemon" },
+        { name: "chronyd.service", description: "NTP client/server" },
+      ],
+      packages: [
+        { name: "bash", version: "5.1.8-9.el9.x86_64" },
+        { name: "nginx", version: "1.26.3-1.el9.x86_64" },
+        { name: "openssl", version: "3.2.2-6.el9.x86_64" },
+      ],
+      packageManager: "rpm",
+      packagesHash: "c".repeat(64),
+      packageCount: 3,
+    },
+  });
+  expect(report.status()).toBe(204);
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Open app-01.acme.example" })).toBeVisible();
+  await expect(page.getByText("Disk ≥ 90% full")).toBeVisible();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: "test-results/screenshots/16-servers-light.png", fullPage: true });
+  await page.getByRole("button", { name: "Open app-01.acme.example" }).click();
+  const sheet = page.getByRole("dialog", { name: "app-01.acme.example" });
+  await expect(sheet.getByText("AMD EPYC 7763 64-Core Processor")).toBeVisible();
+  await sheet.getByRole("tab", { name: /Packages/ }).click();
+  await expect(sheet.getByText("openssl")).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/17-server-detail-light.png" });
+});
+
 // Runs last: it changes how the Acme tenant signs in.
 test("an organisation brings its own sign-in provider and can require it", async ({ page }) => {
   await signInAs(page, "ada.owner@acme.example");

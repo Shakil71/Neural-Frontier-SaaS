@@ -61,7 +61,7 @@ rsync -a --delete   --exclude='/apps/web/.next/cache/***' --exclude='/node_modul
   --include='/apps/' --include='/apps/api/' --include='/apps/api/package.json' --include='/apps/api/dist/***' \
   --include='/apps/web/' --include='/apps/web/package.json' --include='/apps/web/next.config.mjs' \
   --include='/apps/web/.next/***' --include='/apps/web/public/***' \
-  --include='/deploy/***' \
+  --include='/deploy/***' --include='/agent-dist/***' \
   --exclude='*' \
   "$SRC/" "$TARGET/"
 printf '%s\n' "$RELEASE_ID" >"$TARGET/RELEASE"

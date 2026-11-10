@@ -221,6 +221,20 @@ that into findings: **Infrastructure → Exposure**, and a **Security** tab on e
 - **Accepting a finding** needs `servers.manage` and a reason, and is audited. Accepted findings
   stay visible and can be reopened.
 
+## Patch compliance (Phase 4b)
+
+Agents from this release also report pending updates, security advisories (with severity on
+RHEL-family systems) and whether a reboot is needed: **Infrastructure → Updates**, and an
+**Updates** tab on each server. Update findings join the others on **Security findings**
+(formerly Exposure; the old address redirects).
+
+- The agent asks dnf or apt **from the local cache only**, at most hourly. Freshness depends on
+  the system's own timers (`dnf-makecache.timer`, apt's daily update). Package information 7+
+  days old is reported as a finding.
+- The agent unit gains `ReadWritePaths=-/var/cache/dnf`, because dnf takes a lock there even in
+  cache-only mode. Re-running the install command on each server installs the new binary and the
+  updated unit.
+
 ## Backups
 
 ```bash

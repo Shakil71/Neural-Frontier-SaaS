@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { Exposure } from "@/features/servers/findings";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Exposure" };
-
+/** Renamed in Phase 4b: the page now covers update findings too. */
 export default function Page() {
-  return <Exposure />;
+  redirect("/findings");
 }

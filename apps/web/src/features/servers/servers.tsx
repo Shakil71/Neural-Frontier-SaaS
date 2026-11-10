@@ -21,6 +21,7 @@ import {
   MemoryStick,
   Network,
   Package,
+  PackageCheck,
   Plus,
   Search,
   Server,
@@ -57,6 +58,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { usePermissions } from "@/lib/session";
 import { ExposurePanel, FindingsPill } from "./exposure";
+import { PatchPanel, UpdatesBadge } from "./patches";
 
 const keys = { servers: ["servers"] as const, enrollment: ["agent-enrollment-keys"] as const };
 const KeysSchema = z.object({
@@ -343,9 +345,10 @@ function ServerCard({ s, index, onOpen }: { s: ServerSummary; index: number; onO
         <p className="truncate text-[12.5px] text-muted">
           {s.os?.prettyName ?? "Waiting for first report"}
         </p>
-        {s.findings && (
-          <div className="mt-2.5">
-            <FindingsPill counts={s.findings} />
+        {(s.findings || s.updates) && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {s.findings && <FindingsPill counts={s.findings} />}
+            {s.updates && <UpdatesBadge u={s.updates} />}
           </div>
         )}
         <div className="mt-4 grid gap-3">
@@ -376,7 +379,8 @@ function ServerCard({ s, index, onOpen }: { s: ServerSummary; index: number; onO
   );
 }
 
-export type ServerTab = "overview" | "security" | "disks" | "network" | "services" | "packages";
+export type ServerTab =
+  "overview" | "security" | "updates" | "disks" | "network" | "services" | "packages";
 
 export function ServerSheet({
   id,
@@ -427,12 +431,19 @@ export function ServerSheet({
     [s, q],
   );
 
-  const openFindings = s?.findings
-    ? s.findings.high + s.findings.medium + s.findings.low
+  // Exposure findings only; update findings are counted on the Updates tab.
+  const openFindings = s?.exposure
+    ? s.exposure.findings.filter((f) => !f.accepted).length
     : undefined;
   const tabs: { id: ServerTab; label: string; icon: typeof Server; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Server },
     { id: "security", label: "Security", icon: ShieldCheck, count: openFindings },
+    {
+      id: "updates",
+      label: "Updates",
+      icon: PackageCheck,
+      count: s?.updates?.security || undefined,
+    },
     { id: "disks", label: "Disks", icon: HardDrive, count: s?.disks.length },
     { id: "network", label: "Network", icon: Network, count: s?.interfaces.length },
     { id: "services", label: "Services", icon: Workflow, count: s?.services.length },
@@ -570,6 +581,8 @@ export function ServerSheet({
             )}
 
             {tab === "security" && <ExposurePanel s={s} canManage={can("servers.manage")} />}
+
+            {tab === "updates" && <PatchPanel s={s} canManage={can("servers.manage")} />}
 
             {tab === "disks" && (
               <ul className="space-y-2.5">
@@ -818,7 +831,7 @@ export function Servers() {
         <>
           {high > 0 && (
             <Link
-              href="/exposure"
+              href="/findings"
               className="mb-4 flex items-center gap-3 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-[13px] transition-colors hover:border-danger/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/30"
             >
               <ShieldAlert className="size-4 shrink-0 text-danger" aria-hidden />

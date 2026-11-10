@@ -82,6 +82,35 @@ export const AgentSshSchema = z.object({
 });
 export type AgentSsh = z.infer<typeof AgentSshSchema>;
 
+/** One package with a newer version available (Phase 4b). */
+export const AgentPendingUpdateSchema = z.object({
+  name: short(256),
+  arch: short(32),
+  version: short(128),
+  security: z.boolean(),
+  /** Critical, Important, Moderate or Low; "" when the distribution publishes none (Debian). */
+  severity: short(32),
+  advisory: short(64),
+});
+export type AgentPendingUpdate = z.infer<typeof AgentPendingUpdateSchema>;
+
+export const UpdatesStatusSchema = z.enum(["ok", "unavailable", "unsupported"]);
+
+export const AgentUpdatesSchema = z.object({
+  status: UpdatesStatusSchema,
+  error: short(300),
+  manager: z.enum(["rpm", "dpkg", "none"]),
+  checkedAt: z.iso.datetime(),
+  /** When the package metadata was last refreshed; results are only as fresh as this. */
+  metadataAt: z.iso.datetime().nullable(),
+  pending: z.array(AgentPendingUpdateSchema).max(5000),
+  /** Null when it can't be told (no kernel packages, unknown distribution). */
+  rebootRequired: z.boolean().nullable(),
+  runningKernel: short(128),
+  newestKernel: short(128),
+});
+export type AgentUpdates = z.infer<typeof AgentUpdatesSchema>;
+
 export const AgentInventorySchema = z.object({
   agentVersion: short(64),
   collectedAt: z.iso.datetime(),
@@ -114,6 +143,8 @@ export const AgentInventorySchema = z.object({
   listeners: z.array(AgentListenerSchema).max(512).optional(),
   firewall: AgentFirewallSchema.optional(),
   ssh: AgentSshSchema.optional(),
+  /** Patch state; absent from agents released before Phase 4b. */
+  updates: AgentUpdatesSchema.optional(),
 });
 export type AgentInventory = z.infer<typeof AgentInventorySchema>;
 
@@ -213,6 +244,19 @@ export const ServerSummarySchema = z.object({
   enrolledAt: z.iso.datetime(),
   /** Open (not accepted) findings; null until an agent that reports exposure has reported. */
   findings: FindingCountsSchema.nullable(),
+  /** Patch compliance; null until an agent that reports updates has reported. */
+  updates: z
+    .object({
+      status: UpdatesStatusSchema,
+      pending: z.number().int(),
+      security: z.number().int(),
+      /** Security updates rated Critical or Important (RPM-based systems). */
+      urgent: z.number().int(),
+      rebootRequired: z.boolean().nullable(),
+      checkedAt: z.iso.datetime(),
+      metadataAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
 });
 export type ServerSummary = z.infer<typeof ServerSummarySchema>;
 
@@ -223,6 +267,10 @@ export const ServerDetailSchema = ServerSummarySchema.extend({
   services: z.array(AgentServiceSchema),
   packages: z.array(AgentPackageSchema),
   packageManager: z.string().nullable(),
+  /** Null when the agent predates update reporting. */
+  patches: AgentUpdatesSchema.nullable(),
+  /** Findings from the patch state (security updates, reboot, stale metadata). */
+  patchFindings: z.array(ServerFindingSchema),
   /** Null when the agent predates exposure reporting. */
   exposure: z
     .object({
@@ -279,3 +327,34 @@ export const TenantFindingsSchema = z.object({
 export type TenantFindings = z.infer<typeof TenantFindingsSchema>;
 
 export const AcceptFindingSchema = z.object({ reason: z.string().trim().min(3).max(500) });
+
+/** Patch compliance across the organisation's active servers (Infrastructure → Updates). */
+export const FleetUpdatesSchema = z.object({
+  servers: z.array(
+    z.object({
+      serverId: IdSchema,
+      hostname: z.string(),
+      os: z.string().nullable(),
+      status: ServerStatusSchema,
+      updates: ServerSummarySchema.shape.updates,
+    }),
+  ),
+  /** Packages with security updates pending, across servers, most widespread first. */
+  topPackages: z.array(
+    z.object({
+      name: z.string(),
+      servers: z.number().int(),
+      severity: z.string(),
+      advisory: z.string(),
+    }),
+  ),
+  totals: z.object({
+    servers: z.number().int(),
+    reporting: z.number().int(),
+    upToDate: z.number().int(),
+    withSecurity: z.number().int(),
+    rebootRequired: z.number().int(),
+    securityUpdates: z.number().int(),
+  }),
+});
+export type FleetUpdates = z.infer<typeof FleetUpdatesSchema>;

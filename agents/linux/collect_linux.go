@@ -114,7 +114,7 @@ func collectPackages(ctx context.Context) (manager string, pkgs []Package, hash 
 }
 
 // Collect gathers the inventory. It only reads: /proc, /etc and read-only commands
-// (rpm/dpkg, systemctl, firewall-cmd).
+// (rpm/dpkg, systemctl, firewall-cmd, dnf/apt from their local caches).
 func Collect(ctx context.Context) Inventory {
 	osr := parseOSRelease(readFile("/etc/os-release"))
 	total, avail := parseMeminfo(readFile("/proc/meminfo"))
@@ -160,5 +160,6 @@ func Collect(ctx context.Context) Inventory {
 		Listeners:      collectListeners(),
 		Firewall:       collectFirewall(ctx),
 		SSH:            collectSSH(),
+		Updates:        collectUpdates(ctx, manager, pkgs),
 	}
 }

@@ -6,6 +6,7 @@ import type {
   AgentInventory,
   EnrollmentKey,
   IssuedEnrollmentKey,
+  FleetUpdates,
   ServerDetail,
   ServerFinding,
   ServerStatus,
@@ -20,6 +21,7 @@ import type { Principal, RequestMeta } from "../../common/principal.js";
 import { DatabaseService } from "../../infra/database.service.js";
 import { AuditService } from "../audit/audit.service.js";
 import { analyseListeners, countOpen, findings, hasPublicAddress } from "./exposure.js";
+import { isUrgent, updateFindings, updatesSummary } from "./patches.js";
 import type { CreateEnrollmentKeySchema } from "@nf/contracts";
 
 const DAY_MS = 86_400_000;
@@ -79,22 +81,15 @@ export class ServersService {
   }
 
   /**
-   * Exposure analysis of the latest report, with accepted findings marked. Null when the agent
-   * predates exposure reporting (or hasn't reported yet).
+   * Analysis of the latest report: network exposure (4a) and patch state (4b), each null when
+   * the agent predates it, with findings from both and accepted ones marked.
    */
-  private exposure(r: ServerRow, acceptances: AcceptanceRow[]) {
+  private analyse(r: ServerRow, acceptances: AcceptanceRow[]) {
     const inv = (r.inventory ?? null) as StoredInventory | null;
-    if (!inv?.listeners || !inv.firewall || !inv.ssh) return null;
-    const listeners = analyseListeners(inv.listeners, inv.firewall);
     const accepted = new Map(
       acceptances.filter((a) => a.serverId === r.id).map((a) => [a.findingKey, a]),
     );
-    const list: ServerFinding[] = findings({
-      listeners,
-      firewall: inv.firewall,
-      ssh: inv.ssh,
-      publicHost: hasPublicAddress(inv.interfaces.flatMap((i) => i.addresses)),
-    }).map((f) => {
+    const mark = (f: Omit<ServerFinding, "accepted">): ServerFinding => {
       const a = accepted.get(f.key);
       return {
         ...f,
@@ -102,13 +97,30 @@ export class ServersService {
           ? { reason: a.reason, acceptedBy: a.acceptedBy, acceptedAt: a.acceptedAt.toISOString() }
           : null,
       };
-    });
-    return { listeners, firewall: inv.firewall, ssh: inv.ssh, findings: list };
+    };
+    let exposure = null;
+    if (inv?.listeners && inv.firewall && inv.ssh) {
+      const listeners = analyseListeners(inv.listeners, inv.firewall);
+      const list = findings({
+        listeners,
+        firewall: inv.firewall,
+        ssh: inv.ssh,
+        publicHost: hasPublicAddress(inv.interfaces.flatMap((i) => i.addresses)),
+      }).map(mark);
+      exposure = { listeners, firewall: inv.firewall, ssh: inv.ssh, findings: list };
+    }
+    const patches = inv?.updates ?? null;
+    const patchFindings = patches ? updateFindings(patches).map(mark) : [];
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    const all = [...(exposure?.findings ?? []), ...patchFindings].sort(
+      (a, b) => rank[a.severity] - rank[b.severity] || a.key.localeCompare(b.key),
+    );
+    return { exposure, patches, patchFindings, all, reporting: !!exposure || !!patches };
   }
 
   private summary(r: ServerRow, acceptances: AcceptanceRow[]): ServerSummary {
     const inv = (r.inventory ?? null) as StoredInventory | null;
-    const exposure = r.lifecycle === "active" ? this.exposure(r, acceptances) : null;
+    const a = r.lifecycle === "active" ? this.analyse(r, acceptances) : null;
     const diskPeak = inv?.disks?.length
       ? Math.max(...inv.disks.map((d) => (d.sizeBytes > 0 ? d.usedBytes / d.sizeBytes : 0)))
       : null;
@@ -132,7 +144,8 @@ export class ServersService {
       agentVersion: r.agentVersion,
       lastSeenAt: r.lastSeenAt?.toISOString() ?? null,
       enrolledAt: r.enrolledAt.toISOString(),
-      findings: exposure ? countOpen(exposure.findings) : null,
+      findings: a?.reporting ? countOpen(a.all) : null,
+      updates: a?.patches ? updatesSummary(a.patches) : null,
     };
   }
 
@@ -161,9 +174,12 @@ export class ServersService {
     ]);
     if (!r) throw Errors.notFound("Server");
     const inv = (r.inventory ?? null) as StoredInventory | null;
+    const a = r.lifecycle === "active" ? this.analyse(r, acceptances) : null;
     return {
       ...this.summary(r, acceptances),
-      exposure: r.lifecycle === "active" ? this.exposure(r, acceptances) : null,
+      exposure: a?.exposure ?? null,
+      patches: a?.patches ?? null,
+      patchFindings: a?.patchFindings ?? [],
       machineId: r.machineId,
       disks: inv?.disks ?? [],
       interfaces: inv?.interfaces ?? [],
@@ -186,10 +202,10 @@ export class ServersService {
     const items: TenantFindings["items"] = [];
     let reporting = 0;
     for (const r of rows) {
-      const e = this.exposure(r as ServerRow, acceptances);
-      if (!e) continue;
+      const a = this.analyse(r as ServerRow, acceptances);
+      if (!a.reporting) continue;
       reporting++;
-      for (const f of e.findings) items.push({ ...f, serverId: r.id, hostname: r.hostname });
+      for (const f of a.all) items.push({ ...f, serverId: r.id, hostname: r.hostname });
     }
     const rank = { high: 0, medium: 1, low: 2 } as const;
     items.sort(
@@ -206,6 +222,71 @@ export class ServersService {
       serversReporting: reporting,
       serversTotal: rows.length,
     };
+  }
+
+  /** Patch compliance across the organisation's active servers. */
+  async fleetUpdates(tenantId: string): Promise<FleetUpdates> {
+    const rows = await this.database.db.server.findMany({
+      where: { tenantId, lifecycle: "active" },
+      orderBy: { hostname: "asc" },
+      omit: { packages: true },
+    });
+    const servers: FleetUpdates["servers"] = [];
+    const packages = new Map<string, { servers: number; severity: string; advisory: string }>();
+    const totals = {
+      servers: rows.length,
+      reporting: 0,
+      upToDate: 0,
+      withSecurity: 0,
+      rebootRequired: 0,
+      securityUpdates: 0,
+    };
+    const rank = (s: string) =>
+      ({ critical: 4, important: 3, moderate: 2, low: 1 })[s.toLowerCase()] ?? 0;
+    for (const r of rows) {
+      const inv = (r.inventory ?? null) as StoredInventory | null;
+      const u = inv?.updates ?? null;
+      const summary = u ? updatesSummary(u) : null;
+      servers.push({
+        serverId: r.id,
+        hostname: r.hostname,
+        os: inv?.os.prettyName ?? null,
+        status: this.status(r as ServerRow),
+        updates: summary,
+      });
+      if (!u || u.status !== "ok" || !summary) continue;
+      totals.reporting++;
+      if (summary.pending === 0 && !summary.rebootRequired) totals.upToDate++;
+      if (summary.security > 0) totals.withSecurity++;
+      if (summary.rebootRequired) totals.rebootRequired++;
+      totals.securityUpdates += summary.security;
+      for (const p of new Map(
+        u.pending.filter((x) => x.security).map((x) => [x.name, x]),
+      ).values()) {
+        const cur = packages.get(p.name);
+        if (!cur) {
+          packages.set(p.name, { servers: 1, severity: p.severity, advisory: p.advisory });
+        } else {
+          cur.servers++;
+          if (rank(p.severity) > rank(cur.severity)) {
+            cur.severity = p.severity;
+            cur.advisory = p.advisory;
+          }
+        }
+      }
+    }
+    const urgencyOf = (s: string) => (isUrgent(s) ? 1 : 0);
+    const topPackages = [...packages.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort(
+        (a, b) =>
+          urgencyOf(b.severity) - urgencyOf(a.severity) ||
+          b.servers - a.servers ||
+          rank(b.severity) - rank(a.severity) ||
+          a.name.localeCompare(b.name),
+      )
+      .slice(0, 20);
+    return { servers, topPackages, totals };
   }
 
   /**
@@ -226,7 +307,7 @@ export class ServersService {
         omit: { packages: true },
       });
       if (!r || r.lifecycle !== "active") throw Errors.notFound("Server");
-      const current = this.exposure(r as ServerRow, [])?.findings.find((f) => f.key === key);
+      const current = this.analyse(r as ServerRow, []).all.find((f) => f.key === key);
       if (!current) throw Errors.notFound("Finding");
       const row = await tx.serverFindingAcceptance.upsert({
         where: { tenantId_serverId_findingKey: { tenantId, serverId, findingKey: key }, tenantId },
@@ -495,6 +576,8 @@ ProtectControlGroups=yes
 RestrictSUIDSGID=yes
 LockPersonality=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+# dnf takes a lock in its cache even when answering from the cache only (dnf -C).
+ReadWritePaths=-/var/cache/dnf
 MemoryMax=256M
 CPUQuota=20%
 

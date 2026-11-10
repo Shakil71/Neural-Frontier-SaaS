@@ -155,6 +155,23 @@ Signing out now also ends the identity provider's session, using RP-initiated lo
 `id_token_hint`. The provider must allow `https://<host>:8643/sign-in` as a post-logout
 redirect URI. `install-keycloak.sh` already registers it for Keycloak.
 
+## Built-in sign-in (Phase 3a)
+
+People can sign in with a Neural Frontier password and an authenticator app, without Keycloak.
+Owners choose the rules in **Organisation → Built-in sign-in**. Administrators issue set-up and
+reset links from each person's **Sign-in** panel.
+
+**Break-glass** (nobody who could issue a link can sign in, for example a fresh install without
+single sign-on, or a locked-out owner). As root on the server:
+
+```bash
+sudo /usr/local/lib/neural-frontier/sign-in-link.sh owner@example.com "Owner locked out, ticket 123"
+```
+
+It prints a one-time link. It runs the API's own command with the API's configuration, and the audit
+log records it as `system:operator`. Two-step sign-in needs `NF_DATA_KEY`, which `install.sh`
+already generates.
+
 ## Backups
 
 ```bash

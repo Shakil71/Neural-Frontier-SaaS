@@ -11,6 +11,7 @@ import { formatDateTime } from "@/lib/format";
 import { usePermissions } from "@/lib/session";
 import { IdentityProviderCard } from "./identity-provider-card";
 import { ProvisioningCard } from "./provisioning-card";
+import { SignInPolicyCard } from "./sign-in-policy-card";
 
 const TenantSchema = z.object({
   id: z.string(),
@@ -127,6 +128,7 @@ export function Settings() {
             </CardBody>
           </Card>
 
+          <SignInPolicyCard />
           <IdentityProviderCard sharedConfigured={t.sso.sharedConfigured ?? t.sso.configured} />
           <ProvisioningCard />
         </div>

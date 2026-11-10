@@ -132,7 +132,8 @@ setsebool -P httpd_can_network_connect on
 firewall-cmd --reload >/dev/null
 
 log "root-owned operations scripts"
-install -o root -g root -m 0755 "$HERE/lib.sh" "$HERE/backup.sh" "$HERE/restore-test.sh" "$HERE/validate.sh" "$ROOT_LIB/"
+install -o root -g root -m 0755 "$HERE/lib.sh" "$HERE/backup.sh" "$HERE/restore-test.sh" "$HERE/validate.sh" \
+  "$HERE/sign-in-link.sh" "$ROOT_LIB/"
 
 log "systemd units"
 install -o root -g root -m 0644 "$KIT"/systemd/neural-frontier-{api,web,worker,backup}.service "$KIT/systemd/neural-frontier-backup.timer" /etc/systemd/system/

@@ -58,6 +58,13 @@ import {
   ServicePrincipalsController,
 } from "./modules/machine-identity/service-principals.controller.js";
 import { ServicePrincipalsService } from "./modules/machine-identity/service-principals.service.js";
+import {
+  IdentitySignInController,
+  MySecurityController,
+  SignInController,
+  SignInPolicyController,
+} from "./modules/local-auth/local-auth.controller.js";
+import { LocalAuthService } from "./modules/local-auth/local-auth.service.js";
 
 /**
  * Modular monolith root. Domains (auth, authz, audit, identities, roles, tenant, dashboard, connectors,
@@ -125,6 +132,10 @@ export class AppModule implements NestModule {
         ScimController,
         ServersController,
         AgentController,
+        SignInController,
+        MySecurityController,
+        IdentitySignInController,
+        SignInPolicyController,
       ],
       providers: [
         AuditService,
@@ -148,6 +159,7 @@ export class AppModule implements NestModule {
         ScimAuthGuard,
         ServersService,
         AgentGuard,
+        LocalAuthService,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

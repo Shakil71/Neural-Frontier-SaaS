@@ -113,7 +113,7 @@ export interface AppConfig {
   redisUrl: string | null;
   publicUrl: URL;
   sessionSecret: string;
-  cookie: { secure: boolean; sessionName: string; loginStateName: string };
+  cookie: { secure: boolean; sessionName: string; loginStateName: string; challengeName: string };
   session: { idleMs: number; absoluteMs: number };
   trustProxy: string;
   oidc: {
@@ -172,6 +172,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       // __Host- cookies are pinned to the exact origin: Secure, Path=/, no Domain.
       sessionName: e.NF_COOKIE_SECURE ? "__Host-nf_session" : "nf_session",
       loginStateName: e.NF_COOKIE_SECURE ? "__Host-nf_login" : "nf_login",
+      challengeName: e.NF_COOKIE_SECURE ? "__Host-nf_2fa" : "nf_2fa",
     },
     session: {
       idleMs: e.NF_SESSION_IDLE_MINUTES * 60_000,

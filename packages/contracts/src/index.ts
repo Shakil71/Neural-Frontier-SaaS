@@ -11,3 +11,4 @@ export * from "./service-principals.js";
 export * from "./identity-provider.js";
 export * from "./scim.js";
 export * from "./servers.js";
+export * from "./local-auth.js";

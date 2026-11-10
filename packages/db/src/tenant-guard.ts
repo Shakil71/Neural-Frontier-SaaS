@@ -28,6 +28,10 @@ export const TENANT_SCOPED_MODELS = new Set([
   "ScimToken",
   "AgentEnrollmentKey",
   "Server",
+  "LocalCredential",
+  "RecoveryCode",
+  "SignInLink",
+  "TenantSignInPolicy",
 ]);
 
 const READ_OR_FILTERED_WRITE = new Set([

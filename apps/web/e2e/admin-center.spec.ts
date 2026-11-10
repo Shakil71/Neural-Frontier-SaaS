@@ -45,7 +45,9 @@ test("owner signs in, grants a role, and the change is audited", async ({ page }
   const sheet = page.getByRole("dialog", { name: "Grace Analyst" });
   await sheet.getByRole("button", { name: "Grant role" }).click();
   const grant = page.getByRole("dialog", { name: /Grant a role/ });
-  await grant.getByLabel("Role").selectOption({ label: "Security Auditor — 7 permissions" });
+  // Select by role name: the permission count in the label grows as features are added.
+  const auditorOption = grant.locator("option", { hasText: "Security Auditor" });
+  await grant.getByLabel("Role").selectOption((await auditorOption.getAttribute("value")) ?? "");
   await grant.getByLabel("Reason").fill("Quarterly access review");
   await grant.getByRole("button", { name: "Grant role" }).click();
   await expect(page.getByText("Role granted")).toBeVisible();

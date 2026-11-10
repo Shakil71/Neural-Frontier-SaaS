@@ -30,7 +30,7 @@ export function DialogContent({
       <D.Overlay className={overlay} />
       <D.Content
         className={cn(
-          "fixed left-1/2 top-[12vh] z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 rounded-xl border border-border-strong bg-surface-raised p-6 shadow-pop data-[state=open]:animate-fade-in",
+          "scrollbar-thin fixed left-1/2 top-[8vh] z-50 max-h-[84dvh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 overflow-y-auto rounded-xl border border-border-strong bg-surface-raised p-6 shadow-pop data-[state=open]:animate-fade-in",
           className,
         )}
       >

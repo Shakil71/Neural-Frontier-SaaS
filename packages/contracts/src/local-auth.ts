@@ -91,7 +91,7 @@ export type DiscoverSignInResponse = z.infer<typeof DiscoverSignInResponseSchema
 export const PasswordSignInSchema = z.object({
   email: EmailSchema,
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
-  returnTo: z.string().max(512).optional(),
+  returnTo: z.string().max(2048).optional(),
 });
 export type PasswordSignIn = z.infer<typeof PasswordSignInSchema>;
 

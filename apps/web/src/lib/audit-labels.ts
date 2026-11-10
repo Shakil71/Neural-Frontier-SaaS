@@ -1,5 +1,6 @@
 import type { AuditAction } from "@nf/contracts";
 import {
+  AppWindow,
   Bot,
   Fingerprint,
   Cable,
@@ -131,6 +132,15 @@ export const AUDIT_LABELS: Record<
   },
   "auth.session_revoked": { label: "Session ended", icon: LogOut, tone: "neutral" },
   "auth.sessions_revoked": { label: "Signed out everywhere", icon: LogOut, tone: "warning" },
+  "application.created": { label: "Application registered", icon: AppWindow, tone: "primary" },
+  "application.updated": { label: "Application changed", icon: AppWindow, tone: "warning" },
+  "application.deleted": { label: "Application deleted", icon: Trash2, tone: "danger" },
+  "application.secret_rotated": {
+    label: "Application secret replaced",
+    icon: KeySquare,
+    tone: "warning",
+  },
+  "auth.app_sign_in": { label: "Signed in to an application", icon: LogIn, tone: "neutral" },
 };
 
 export function auditLabel(action: string) {

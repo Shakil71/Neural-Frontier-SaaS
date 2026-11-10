@@ -45,7 +45,7 @@ describe("safeReturnTo (open-redirect protection)", () => {
     "/\u0000x",
     undefined,
     42,
-    "/" + "a".repeat(600),
+    "/" + "a".repeat(2100),
   ])("rejects %s", (input) => {
     expect(safeReturnTo(input)).toBe("/");
   });

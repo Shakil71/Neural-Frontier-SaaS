@@ -26,5 +26,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.sign_in_links           
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.tenant_sign_in_policies TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.tenant_email_settings   TO 'nf_app'@'127.0.0.1';
 GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.email_messages          TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.oauth_applications        TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.oauth_authorization_codes TO 'nf_app'@'127.0.0.1';
+GRANT SELECT, INSERT, UPDATE, DELETE ON neural_frontier.oidc_signing_keys         TO 'nf_app'@'127.0.0.1';
 -- Append-only audit trail.
 GRANT SELECT, INSERT                 ON neural_frontier.audit_events     TO 'nf_app'@'127.0.0.1';

@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   "service_principals.manage": "Create service principals and issue or revoke their secrets",
   "servers.read": "View Linux servers and their inventory",
   "servers.manage": "Enrol and retire servers and manage agent enrollment keys",
+  "applications.read": "View applications that sign people in with Neural Frontier",
+  "applications.manage": "Register applications, manage their secrets and who may use them",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -79,6 +81,8 @@ export const BUILT_IN_ROLES = {
       "service_principals.read",
       "servers.read",
       "servers.manage",
+      "applications.read",
+      "applications.manage",
     ],
   },
   security_auditor: {
@@ -93,6 +97,7 @@ export const BUILT_IN_ROLES = {
       "connectors.read",
       "service_principals.read",
       "servers.read",
+      "applications.read",
     ],
   },
   member: {

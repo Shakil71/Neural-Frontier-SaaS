@@ -25,7 +25,7 @@ export function safeEqual(a: string, b: string): boolean {
  * Rejects absolute URLs, protocol-relative `//host`, and backslash tricks.
  */
 export function safeReturnTo(value: unknown): string {
-  if (typeof value !== "string" || value.length > 512) return "/";
+  if (typeof value !== "string" || value.length > 2048) return "/";
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";
   if (/[\u0000-\u001f]/.test(value)) return "/";
   return value;

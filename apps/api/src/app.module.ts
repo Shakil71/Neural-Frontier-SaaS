@@ -67,6 +67,13 @@ import {
 } from "./modules/local-auth/local-auth.controller.js";
 import { LocalAuthService } from "./modules/local-auth/local-auth.service.js";
 import { EmailController } from "./modules/email/email.controller.js";
+import { ApplicationsService } from "./modules/oidc-provider/applications.service.js";
+import {
+  ApplicationsController,
+  OidcProviderController,
+} from "./modules/oidc-provider/provider.controller.js";
+import { OidcProviderService } from "./modules/oidc-provider/provider.service.js";
+import { SigningKeys } from "./modules/oidc-provider/signing-keys.js";
 import { EmailService } from "./modules/email/email.service.js";
 
 /**
@@ -141,6 +148,8 @@ export class AppModule implements NestModule {
         SignInPolicyController,
         MySessionsController,
         EmailController,
+        OidcProviderController,
+        ApplicationsController,
       ],
       providers: [
         AuditService,
@@ -166,6 +175,9 @@ export class AppModule implements NestModule {
         AgentGuard,
         LocalAuthService,
         EmailService,
+        ApplicationsService,
+        OidcProviderService,
+        SigningKeys,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

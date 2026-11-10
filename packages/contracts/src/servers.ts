@@ -33,6 +33,55 @@ export const AgentPackageSchema = z.object({
 });
 export type AgentPackage = z.infer<typeof AgentPackageSchema>;
 
+const port = z.number().int().min(0).max(65535);
+const Proto = z.enum(["tcp", "udp"]);
+
+/** A socket waiting for connections (Phase 4a). */
+export const AgentListenerSchema = z.object({
+  proto: Proto,
+  address: short(64),
+  port,
+  user: short(64),
+  /** Empty when the agent may not see the owning process. */
+  process: short(64),
+});
+export type AgentListener = z.infer<typeof AgentListenerSchema>;
+
+/** Traffic a firewall lets in: from anywhere, or only from specific sources ("limited"). */
+export const AgentPortRangeSchema = z.object({
+  proto: Proto,
+  from: port,
+  to: port,
+  scope: z.enum(["any", "limited"]),
+});
+export type AgentPortRange = z.infer<typeof AgentPortRangeSchema>;
+
+export const FirewallKindSchema = z.enum(["firewalld", "ufw", "nftables", "iptables", "none"]);
+
+export const AgentFirewallSchema = z.object({
+  kind: FirewallKindSchema,
+  active: z.boolean(),
+  /** False when a firewall runs but its rules can't be read without CAP_NET_ADMIN. */
+  rulesKnown: z.boolean(),
+  /** Incoming traffic is accepted unless a rule blocks it. */
+  defaultAllow: z.boolean(),
+  zones: z.array(short(64)).max(64),
+  allowed: z.array(AgentPortRangeSchema).max(1024),
+});
+export type AgentFirewall = z.infer<typeof AgentFirewallSchema>;
+
+/** Effective sshd settings (global section; Match blocks are not evaluated). */
+export const AgentSshSchema = z.object({
+  present: z.boolean(),
+  ports: z.array(port).max(16),
+  permitRootLogin: short(32),
+  passwordAuthentication: short(32),
+  kbdInteractiveAuthentication: short(32),
+  usePam: short(32),
+  permitEmptyPasswords: short(32),
+});
+export type AgentSsh = z.infer<typeof AgentSshSchema>;
+
 export const AgentInventorySchema = z.object({
   agentVersion: short(64),
   collectedAt: z.iso.datetime(),
@@ -61,6 +110,10 @@ export const AgentInventorySchema = z.object({
   packageManager: z.enum(["rpm", "dpkg", "none"]),
   packagesHash: short(64),
   packageCount: z.number().int().nonnegative(),
+  /** Network exposure; absent from agents released before Phase 4a. */
+  listeners: z.array(AgentListenerSchema).max(512).optional(),
+  firewall: AgentFirewallSchema.optional(),
+  ssh: AgentSshSchema.optional(),
 });
 export type AgentInventory = z.infer<typeof AgentInventorySchema>;
 
@@ -79,6 +132,65 @@ export const AgentEnrollResponseSchema = z.object({
 
 export const ServerStatusSchema = z.enum(["online", "stale", "offline", "retired"]);
 export type ServerStatus = z.infer<typeof ServerStatusSchema>;
+
+export const FindingSeveritySchema = z.enum(["high", "medium", "low"]);
+export type FindingSeverity = z.infer<typeof FindingSeveritySchema>;
+
+/** Stable identifier of a finding on one server, e.g. "port.exposed:tcp:3306". */
+export const FindingKeySchema = z.string().regex(/^[a-z0-9._:-]{1,128}$/);
+
+export const FindingAcceptanceSchema = z.object({
+  reason: z.string(),
+  acceptedBy: z.string(),
+  acceptedAt: z.iso.datetime(),
+});
+
+export const ServerFindingSchema = z.object({
+  key: FindingKeySchema,
+  severity: FindingSeveritySchema,
+  title: z.string(),
+  detail: z.string(),
+  /** What to change on the server to resolve it. */
+  remedy: z.string(),
+  /** Set when an administrator accepted the risk; accepted findings don't count as open. */
+  accepted: FindingAcceptanceSchema.nullable(),
+});
+export type ServerFinding = z.infer<typeof ServerFindingSchema>;
+
+export const FindingCountsSchema = z.object({
+  high: z.number().int(),
+  medium: z.number().int(),
+  low: z.number().int(),
+});
+export type FindingCounts = z.infer<typeof FindingCountsSchema>;
+
+/**
+ * Where a listener can be reached from: loopback (this machine only), a private network
+ * address, a public address, or every interface.
+ */
+export const ListenerScopeSchema = z.enum(["loopback", "private", "public", "all"]);
+/**
+ * What the firewall does with traffic to it: open (no firewall, or default-allow), allowed from
+ * anywhere, allowed only from some sources (limited), blocked, or unknown (rules unreadable).
+ * Loopback listeners are "local".
+ */
+export const ListenerReachSchema = z.enum([
+  "local",
+  "open",
+  "allowed",
+  "limited",
+  "blocked",
+  "unknown",
+]);
+export type ListenerReach = z.infer<typeof ListenerReachSchema>;
+
+export const ServerListenerSchema = AgentListenerSchema.extend({
+  scope: ListenerScopeSchema,
+  reach: ListenerReachSchema,
+  /** A well-known service name for the port, when there is one. */
+  service: z.string().nullable(),
+});
+export type ServerListener = z.infer<typeof ServerListenerSchema>;
 
 export const ServerSummarySchema = z.object({
   id: IdSchema,
@@ -99,6 +211,8 @@ export const ServerSummarySchema = z.object({
   agentVersion: z.string().nullable(),
   lastSeenAt: z.iso.datetime().nullable(),
   enrolledAt: z.iso.datetime(),
+  /** Open (not accepted) findings; null until an agent that reports exposure has reported. */
+  findings: FindingCountsSchema.nullable(),
 });
 export type ServerSummary = z.infer<typeof ServerSummarySchema>;
 
@@ -109,6 +223,15 @@ export const ServerDetailSchema = ServerSummarySchema.extend({
   services: z.array(AgentServiceSchema),
   packages: z.array(AgentPackageSchema),
   packageManager: z.string().nullable(),
+  /** Null when the agent predates exposure reporting. */
+  exposure: z
+    .object({
+      listeners: z.array(ServerListenerSchema),
+      firewall: AgentFirewallSchema,
+      ssh: AgentSshSchema,
+      findings: z.array(ServerFindingSchema),
+    })
+    .nullable(),
 });
 export type ServerDetail = z.infer<typeof ServerDetailSchema>;
 
@@ -137,3 +260,22 @@ export const IssuedEnrollmentKeySchema = z.object({
   installCommand: z.string(),
 });
 export type IssuedEnrollmentKey = z.infer<typeof IssuedEnrollmentKeySchema>;
+
+/** Every finding across the organisation's active servers (Infrastructure → Findings). */
+export const TenantFindingSchema = ServerFindingSchema.extend({
+  serverId: IdSchema,
+  hostname: z.string(),
+});
+export type TenantFinding = z.infer<typeof TenantFindingSchema>;
+
+export const TenantFindingsSchema = z.object({
+  items: z.array(TenantFindingSchema),
+  open: FindingCountsSchema,
+  accepted: z.number().int(),
+  /** Active servers whose agent reports exposure, out of all active servers. */
+  serversReporting: z.number().int(),
+  serversTotal: z.number().int(),
+});
+export type TenantFindings = z.infer<typeof TenantFindingsSchema>;
+
+export const AcceptFindingSchema = z.object({ reason: z.string().trim().min(3).max(500) });

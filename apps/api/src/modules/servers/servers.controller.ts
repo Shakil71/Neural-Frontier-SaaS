@@ -11,6 +11,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Req,
   Res,
   StreamableFile,
@@ -19,9 +20,11 @@ import {
 import { ApiExcludeController, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import {
+  AcceptFindingSchema,
   AgentEnrollRequestSchema,
   AgentInventorySchema,
   CreateEnrollmentKeySchema,
+  FindingKeySchema,
 } from "@nf/contracts";
 import type { Request, Response } from "express";
 import { z } from "zod";
@@ -56,6 +59,40 @@ export class ServersController {
   @RequirePermission("servers.read")
   list(@CurrentPrincipal() p: Principal) {
     return this.servers.list(p.tenantId);
+  }
+
+  /** Exposure findings across all active servers (Infrastructure → Findings). */
+  @Get("server-findings")
+  @MachineAccess()
+  @RequirePermission("servers.read")
+  findings(@CurrentPrincipal() p: Principal) {
+    return this.servers.tenantFindings(p.tenantId);
+  }
+
+  /** Accept the risk of one finding, with a reason (audited). */
+  @Put("servers/:id/findings/:key/acceptance")
+  @RequirePermission("servers.manage")
+  acceptFinding(
+    @CurrentPrincipal() p: Principal,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("key") key: string,
+    @Body() body: unknown,
+    @Meta() meta: RequestMeta,
+  ) {
+    const { reason } = parse(AcceptFindingSchema, body);
+    return this.servers.acceptFinding(p, id, parse(FindingKeySchema, key), reason, meta);
+  }
+
+  @Delete("servers/:id/findings/:key/acceptance")
+  @HttpCode(204)
+  @RequirePermission("servers.manage")
+  async reopenFinding(
+    @CurrentPrincipal() p: Principal,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("key") key: string,
+    @Meta() meta: RequestMeta,
+  ) {
+    await this.servers.reopenFinding(p, id, parse(FindingKeySchema, key), meta);
   }
 
   @Get("servers/:id")

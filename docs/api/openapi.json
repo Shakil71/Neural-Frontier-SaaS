@@ -739,6 +739,80 @@
         ]
       }
     },
+    "/api/v1/server-findings": {
+      "get": {
+        "operationId": "ServersController_findings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
+    },
+    "/api/v1/servers/{id}/findings/{key}/acceptance": {
+      "put": {
+        "operationId": "ServersController_acceptFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      },
+      "delete": {
+        "operationId": "ServersController_reopenFinding",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "servers"
+        ]
+      }
+    },
     "/api/v1/servers/{id}": {
       "get": {
         "operationId": "ServersController_get",

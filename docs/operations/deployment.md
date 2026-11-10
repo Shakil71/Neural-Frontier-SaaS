@@ -205,6 +205,22 @@ Built-in sign-in (3a) replaces the shared Keycloak. Steps:
 Organisations that connected their own identity provider (Organisation → Single sign-on) are
 unaffected. After the switch, the sign-in screen no longer offers the shared single sign-on.
 
+## Network exposure (Phase 4a)
+
+Agents from this release also report listening ports, the host firewall (firewalld through
+`firewall-cmd`, ufw from its rule files) and the effective `sshd_config`. The Admin Center turns
+that into findings: **Infrastructure → Exposure**, and a **Security** tab on each server.
+
+- **Updating agents.** Agents don't update themselves. On each server, run the install command
+  again (Servers → Add server issues a key): it replaces the binary and re-enrols the same machine,
+  which rotates its token. Until then the server shows "No exposure data from this server yet".
+- **What the agent can't see.** It runs without capabilities, so raw nftables/iptables rules
+  (they need `CAP_NET_ADMIN`) are reported as "running; rules not readable", and the process
+  behind most sockets is unknown (only the owning user is shown). Cloud security groups,
+  upstream firewalls and Docker-published ports are outside the analysis.
+- **Accepting a finding** needs `servers.manage` and a reason, and is audited. Accepted findings
+  stay visible and can be reopened.
+
 ## Backups
 
 ```bash

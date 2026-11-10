@@ -89,6 +89,8 @@ export const AUDIT_LABELS: Record<
   "scim.token_revoked": { label: "Provisioning token revoked", icon: Trash2, tone: "warning" },
   "server.enrolled": { label: "Server enrolled", icon: ServerCog, tone: "primary" },
   "server.retired": { label: "Server retired", icon: ServerOff, tone: "warning" },
+  "server.finding_accepted": { label: "Finding accepted", icon: ShieldOff, tone: "warning" },
+  "server.finding_reopened": { label: "Finding reopened", icon: ShieldCheck, tone: "primary" },
   "agent.enrollment_key_created": {
     label: "Enrollment key issued",
     icon: KeySquare,

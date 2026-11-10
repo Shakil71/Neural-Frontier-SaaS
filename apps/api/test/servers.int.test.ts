@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { IssuedEnrollmentKeySchema, ServerDetailSchema, ServerSummarySchema } from "@nf/contracts";
+import {
+  IssuedEnrollmentKeySchema,
+  ServerDetailSchema,
+  ServerSummarySchema,
+  TenantFindingsSchema,
+} from "@nf/contracts";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -178,6 +183,175 @@ describe("agent lifecycle", () => {
     const stranger = await signIn(t, other.tenantId, other.owner);
     await stranger.get(`/api/v1/servers/${serverId}`).expect(404);
     expect((await stranger.get("/api/v1/servers").expect(200)).body).toEqual([]);
+  });
+});
+
+describe("network exposure and findings", () => {
+  let token: string;
+  let serverId: string;
+  const exposed = {
+    listeners: [
+      { proto: "tcp", address: "0.0.0.0", port: 22, user: "root", process: "sshd" },
+      { proto: "tcp", address: "::", port: 3306, user: "mysql", process: "" },
+      { proto: "tcp", address: "127.0.0.1", port: 6379, user: "redis", process: "" },
+    ],
+    firewall: {
+      kind: "none",
+      active: false,
+      rulesKnown: false,
+      defaultAllow: false,
+      zones: [],
+      allowed: [],
+    },
+    ssh: {
+      present: true,
+      ports: [22],
+      permitRootLogin: "prohibit-password",
+      passwordAuthentication: "yes",
+      kbdInteractiveAuthentication: "no",
+      usePam: "yes",
+      permitEmptyPasswords: "no",
+    },
+  };
+
+  it("an agent without exposure reporting shows no findings (not zero)", async () => {
+    const issued = await newKey(acme, { name: "exposure" });
+    const res = await enroll(issued.key, machine(20), "db-01").expect(200);
+    token = res.body.agentToken;
+    serverId = res.body.serverId;
+    await report(token, inventory(machine(20), { hostname: "db-01" })).expect(204);
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.exposure).toBeNull();
+    expect(detail.findings).toBeNull();
+  });
+
+  it("analyses listeners, firewall and SSH into findings", async () => {
+    await report(token, inventory(machine(20), { hostname: "db-01", ...exposed })).expect(204);
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.exposure!.listeners.map((l) => [l.port, l.scope, l.reach, l.service])).toEqual([
+      [22, "all", "open", "SSH"],
+      [3306, "all", "open", "MySQL"],
+      [6379, "loopback", "local", "Redis"],
+    ]);
+    // 192.168.197.100 is the only address: reachable from the local network, not the internet.
+    expect(detail.exposure!.findings.map((f) => [f.key, f.severity])).toEqual([
+      ["firewall.none", "medium"],
+      ["port.exposed:tcp:3306", "medium"],
+      ["ssh.password_auth", "medium"],
+      ["ssh.root_key", "low"],
+    ]);
+    expect(detail.findings).toEqual({ high: 0, medium: 3, low: 1 });
+
+    const all = TenantFindingsSchema.parse(
+      (await admin.get("/api/v1/server-findings").expect(200)).body,
+    );
+    expect(all.serversReporting).toBe(1);
+    expect(all.items.filter((i) => i.serverId === serverId)).toHaveLength(4);
+    expect(all.open).toEqual({ high: 0, medium: 3, low: 1 });
+  });
+
+  it("administrators accept a finding with a reason (audited); auditors can't", async () => {
+    const key = encodeURIComponent("port.exposed:tcp:3306");
+    const auditor = await signIn(t, acme.tenantId, acme.auditor);
+    await auditor
+      .put(`/api/v1/servers/${serverId}/findings/${key}/acceptance`)
+      .send({ reason: "replica traffic" })
+      .expect(403);
+    await auditor.get("/api/v1/server-findings").expect(200);
+
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    await admin
+      .put(`/api/v1/servers/${serverId}/findings/${key}/acceptance`)
+      .send({ reason: "no" })
+      .expect(400);
+    // Only a finding the server has right now can be accepted.
+    await admin
+      .put(`/api/v1/servers/${serverId}/findings/port.exposed:tcp:5432/acceptance`)
+      .send({ reason: "not a real finding" })
+      .expect(404);
+    await admin
+      .put(`/api/v1/servers/${serverId}/findings/BAD KEY/acceptance`)
+      .send({ reason: "bad key" })
+      .expect(400);
+
+    const res = await admin
+      .put(`/api/v1/servers/${serverId}/findings/${key}/acceptance`)
+      .send({ reason: "Replica traffic from the private network" })
+      .expect(200);
+    expect(res.body.accepted).toMatchObject({ reason: "Replica traffic from the private network" });
+
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.findings).toEqual({ high: 0, medium: 2, low: 1 });
+    const all = TenantFindingsSchema.parse(
+      (await admin.get("/api/v1/server-findings").expect(200)).body,
+    );
+    expect(all.accepted).toBe(1);
+    expect(all.items.at(-1)!.key).toBe("port.exposed:tcp:3306"); // accepted ones sort last
+
+    // The acceptance survives new reports.
+    await report(token, inventory(machine(20), { hostname: "db-01", ...exposed })).expect(204);
+    expect((await admin.get(`/api/v1/servers/${serverId}`)).body.findings.medium).toBe(2);
+
+    const audit = await admin
+      .get("/api/v1/audit-events?action=server.finding_accepted")
+      .expect(200);
+    expect(audit.body.items[0]).toMatchObject({
+      target: { id: serverId },
+      metadata: { finding: "port.exposed:tcp:3306", severity: "medium" },
+    });
+
+    await admin.delete(`/api/v1/servers/${serverId}/findings/${key}/acceptance`).expect(204);
+    await admin.delete(`/api/v1/servers/${serverId}/findings/${key}/acceptance`).expect(404);
+    expect((await admin.get(`/api/v1/servers/${serverId}`)).body.findings.medium).toBe(3);
+    const reopened = await admin
+      .get("/api/v1/audit-events?action=server.finding_reopened")
+      .expect(200);
+    expect(reopened.body.items).toHaveLength(1);
+  });
+
+  it("fixing the server clears the findings", async () => {
+    await report(
+      token,
+      inventory(machine(20), {
+        hostname: "db-01",
+        ...exposed,
+        firewall: {
+          kind: "firewalld",
+          active: true,
+          rulesKnown: true,
+          defaultAllow: false,
+          zones: ["public"],
+          allowed: [{ proto: "tcp", from: 22, to: 22, scope: "any" }],
+        },
+        ssh: { ...exposed.ssh, permitRootLogin: "no", passwordAuthentication: "no" },
+      }),
+    ).expect(204);
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.exposure!.findings).toEqual([]);
+    expect(detail.exposure!.listeners.find((l) => l.port === 3306)!.reach).toBe("blocked");
+  });
+
+  it("findings are invisible to other tenants", async () => {
+    const stranger = await signIn(t, other.tenantId, other.owner);
+    const all = TenantFindingsSchema.parse(
+      (await stranger.get("/api/v1/server-findings").expect(200)).body,
+    );
+    expect(all).toMatchObject({ items: [], serversTotal: 0 });
+    await stranger
+      .put(`/api/v1/servers/${serverId}/findings/ssh.root_key/acceptance`)
+      .send({ reason: "cross-tenant attempt" })
+      .expect(404);
   });
 });
 

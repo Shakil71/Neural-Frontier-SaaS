@@ -902,6 +902,20 @@
         ]
       }
     },
+    "/api/v1/auth/password-reset": {
+      "post": {
+        "operationId": "SignInController_passwordReset",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/me/security": {
       "get": {
         "operationId": "MySecurityController_get",
@@ -1032,6 +1046,29 @@
         ]
       }
     },
+    "/api/v1/identities/{id}/sign-in/sessions/revoke": {
+      "post": {
+        "operationId": "IdentitySignInController_signOutEverywhere",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "identities"
+        ]
+      }
+    },
     "/api/v1/identities/{id}/sign-in/reset-two-factor": {
       "post": {
         "operationId": "IdentitySignInController_resetTwoFactor",
@@ -1093,6 +1130,123 @@
       },
       "put": {
         "operationId": "SignInPolicyController_update",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/me/sessions": {
+      "get": {
+        "operationId": "MySessionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/sessions/{sessionId}": {
+      "delete": {
+        "operationId": "MySessionsController_revoke",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/me/sessions/revoke-others": {
+      "post": {
+        "operationId": "MySessionsController_revokeOthers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/v1/tenant/email": {
+      "get": {
+        "operationId": "EmailController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      },
+      "put": {
+        "operationId": "EmailController_upsert",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      },
+      "delete": {
+        "operationId": "EmailController_remove",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenant/email/test": {
+      "post": {
+        "operationId": "EmailController_test",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenant/email/deliveries": {
+      "get": {
+        "operationId": "EmailController_deliveries",
         "parameters": [],
         "responses": {
           "200": {

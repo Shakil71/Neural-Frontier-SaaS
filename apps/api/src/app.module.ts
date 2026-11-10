@@ -61,10 +61,13 @@ import { ServicePrincipalsService } from "./modules/machine-identity/service-pri
 import {
   IdentitySignInController,
   MySecurityController,
+  MySessionsController,
   SignInController,
   SignInPolicyController,
 } from "./modules/local-auth/local-auth.controller.js";
 import { LocalAuthService } from "./modules/local-auth/local-auth.service.js";
+import { EmailController } from "./modules/email/email.controller.js";
+import { EmailService } from "./modules/email/email.service.js";
 
 /**
  * Modular monolith root. Domains (auth, authz, audit, identities, roles, tenant, dashboard, connectors,
@@ -136,6 +139,8 @@ export class AppModule implements NestModule {
         MySecurityController,
         IdentitySignInController,
         SignInPolicyController,
+        MySessionsController,
+        EmailController,
       ],
       providers: [
         AuditService,
@@ -160,6 +165,7 @@ export class AppModule implements NestModule {
         ServersService,
         AgentGuard,
         LocalAuthService,
+        EmailService,
         // Order matters: rate limiting first, then authentication/CSRF/authorization.
         { provide: APP_GUARD, useClass: ThrottlerGuard },
         { provide: APP_GUARD, useClass: SecurityGuard },

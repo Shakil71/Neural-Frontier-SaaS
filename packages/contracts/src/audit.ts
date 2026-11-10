@@ -44,6 +44,11 @@ export const AUDIT_ACTIONS = [
   "auth.sign_in_link_created",
   "auth.sign_in_link_used",
   "tenant.sign_in_policy_changed",
+  "tenant.email_configured",
+  "tenant.email_removed",
+  "auth.password_reset_requested",
+  "auth.session_revoked",
+  "auth.sessions_revoked",
 ] as const;
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
 export type AuditAction = z.infer<typeof AuditActionSchema>;

@@ -6,6 +6,7 @@ import { AuditService } from "./modules/audit/audit.service.js";
 import { ConnectorsService } from "./modules/connectors/connectors.service.js";
 import { ConnectorScheduler, ConnectorSyncHandler } from "./modules/connectors/sync-handler.js";
 import { JobQueue } from "./modules/jobs/job-queue.js";
+import { EmailSendHandler, EmailService } from "./modules/email/email.service.js";
 import { JOB_HANDLERS, JobWorker, PERIODIC_TASKS } from "./modules/jobs/job-worker.js";
 
 /** The background worker process: no HTTP, just the job queue and its handlers. */
@@ -24,10 +25,12 @@ export class WorkerModule {
         ConnectorsService,
         ConnectorSyncHandler,
         ConnectorScheduler,
+        EmailService,
+        EmailSendHandler,
         {
           provide: JOB_HANDLERS,
-          inject: [ConnectorSyncHandler],
-          useFactory: (sync: ConnectorSyncHandler) => [sync],
+          inject: [ConnectorSyncHandler, EmailSendHandler],
+          useFactory: (sync: ConnectorSyncHandler, email: EmailSendHandler) => [sync, email],
         },
         {
           provide: PERIODIC_TASKS,

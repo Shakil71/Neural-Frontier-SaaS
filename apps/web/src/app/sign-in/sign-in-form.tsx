@@ -8,6 +8,7 @@ import {
   KeyRound,
   Loader2,
   Mail,
+  MailCheck,
   ShieldCheck,
   Smartphone,
   TriangleAlert,
@@ -23,7 +24,8 @@ import { api, ApiRequestError } from "@/lib/api";
 
 type Step =
   | { kind: "email" }
-  | { kind: "password"; email: string; sso: boolean }
+  | { kind: "password"; email: string; sso: boolean; passwordReset: boolean }
+  | { kind: "reset_sent"; email: string }
   | { kind: "two_factor"; email: string }
   | { kind: "enroll"; email: string; setup: TwoFactorSetup }
   | { kind: "recovery"; codes: string[]; redirectTo: string };
@@ -152,7 +154,12 @@ export function SignInForm({
         schema: DiscoverSignInResponseSchema,
       });
       if (methods.password) {
-        setStep({ kind: "password", email: email.toLowerCase(), sso: methods.sso });
+        setStep({
+          kind: "password",
+          email: email.toLowerCase(),
+          sso: methods.sso,
+          passwordReset: methods.passwordReset,
+        });
         setBusy(false);
       } else if (methods.sso) {
         goTo(ssoUrl(returnTo, email));
@@ -267,9 +274,29 @@ export function SignInForm({
           <KeyRound className="size-[18px]" aria-hidden /> Sign in
         </PrimaryButton>
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[12.5px]">
-          <span className="text-subtle">
-            Forgot it? Your administrator can send you a reset link.
-          </span>
+          {step.passwordReset ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await api("/api/v1/auth/password-reset", {
+                    method: "POST",
+                    body: { email: step.email },
+                  });
+                  setStep({ kind: "reset_sent", email: step.email });
+                  setBusy(false);
+                })
+              }
+              className="font-medium text-primary hover:underline"
+            >
+              Forgot password?
+            </button>
+          ) : (
+            <span className="text-subtle">
+              Forgot it? Your administrator can send you a reset link.
+            </span>
+          )}
           {step.sso && (
             <button
               type="button"
@@ -284,6 +311,34 @@ export function SignInForm({
           )}
         </div>
       </form>
+    );
+  }
+
+  if (step.kind === "reset_sent") {
+    return (
+      <div className="mt-8 space-y-4" role="status">
+        <Account email={step.email} onChange={back} />
+        <div className="flex items-start gap-3 pt-1">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+            <MailCheck className="size-[18px]" aria-hidden />
+          </span>
+          <div>
+            <p className="text-[14.5px] font-medium">Check your email</p>
+            <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+              If there&apos;s an account for {step.email}, we&apos;ve sent a link to choose a new
+              password. It works once and expires in 24 hours. Nothing arrived after a few minutes?
+              Check spam, or ask your administrator.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={back}
+          className="text-[12.5px] font-medium text-primary hover:underline"
+        >
+          Back to sign in
+        </button>
+      </div>
     );
   }
 

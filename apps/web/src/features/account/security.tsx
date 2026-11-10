@@ -45,6 +45,7 @@ import { api, ApiRequestError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { useSignOut } from "@/lib/session";
+import { SessionsCard } from "./sessions-card";
 
 const key = ["me", "security"] as const;
 const errorMessage = (err: unknown) =>
@@ -618,6 +619,7 @@ export function AccountSecurity() {
             </Card>
           </div>
           <ChangePasswordDialog data={d} open={pwOpen} onOpenChange={setPwOpen} />
+          <SessionsCard />
           <EnableTwoFactorDialog open={tfOpen} onOpenChange={setTfOpen} />
           <CodeConfirmDialog mode={confirmMode} onClose={() => setConfirmMode(null)} />
         </div>

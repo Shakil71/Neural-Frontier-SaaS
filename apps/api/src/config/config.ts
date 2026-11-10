@@ -68,6 +68,8 @@ const EnvSchema = z
     NF_AGENT_DIST_DIR: z.string().optional(),
     /** PEM certificate served by Nginx; its SHA-256 is pinned by agents when self-signed. */
     NF_TLS_CERT_FILE: z.string().optional(),
+    // Extra CA certificates (PEM) trusted for outgoing mail, e.g. an internal relay's CA.
+    NF_SMTP_CA_FILE: z.string().optional(),
     NF_AGENT_INTERVAL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(300),
   })
   .superRefine((env, ctx) => {
@@ -129,6 +131,7 @@ export interface AppConfig {
   /** Allow http:// OIDC issuers (development and tests only; refused in production). */
   oidcAllowInsecureHttp: boolean;
   agent: { distDir: string; tlsCertFile: string | null; intervalSeconds: number };
+  smtpCaFile: string | null;
   /** Null outside production when NF_DATA_KEY is unset; connectors are then unavailable. */
   dataKey: Buffer | null;
   graph: { authorityUrl: string; apiUrl: string };
@@ -198,6 +201,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       tlsCertFile: e.NF_TLS_CERT_FILE ?? null,
       intervalSeconds: e.NF_AGENT_INTERVAL_SECONDS,
     },
+    smtpCaFile: e.NF_SMTP_CA_FILE ?? null,
     dataKey: e.NF_DATA_KEY ? Buffer.from(e.NF_DATA_KEY, "base64") : null,
     graph: {
       authorityUrl: e.NF_GRAPH_AUTHORITY_URL.replace(/\/+$/, ""),

@@ -130,6 +130,48 @@ export class SessionService {
     });
   }
 
+  /** Sessions currently signed in for one person, most recently active first. */
+  async listActive(tenantId: string, identityId: string) {
+    const now = new Date();
+    return this.database.db.session.findMany({
+      where: {
+        tenantId,
+        identityId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+        idleExpiresAt: { gt: now },
+      },
+      orderBy: { lastSeenAt: "desc" },
+      take: 100,
+    });
+  }
+
+  async countActive(tenantId: string, identityId: string): Promise<number> {
+    const now = new Date();
+    return this.database.db.session.count({
+      where: {
+        tenantId,
+        identityId,
+        revokedAt: null,
+        expiresAt: { gt: now },
+        idleExpiresAt: { gt: now },
+      },
+    });
+  }
+
+  /** Ends one person's sessions, optionally keeping one. Returns how many ended. */
+  async revokeFor(
+    tenantId: string,
+    identityId: string,
+    keep: string | null = null,
+  ): Promise<number> {
+    const res = await this.database.db.session.updateMany({
+      where: { tenantId, identityId, revokedAt: null, ...(keep ? { id: { not: keep } } : {}) },
+      data: { revokedAt: new Date() },
+    });
+    return res.count;
+  }
+
   /** Used when an identity is suspended: every active session ends immediately. */
   async revokeAllFor(
     tenantId: string,

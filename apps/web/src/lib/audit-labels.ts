@@ -12,6 +12,8 @@ import {
   ListRestart,
   Lock,
   LockOpen,
+  Mail,
+  MailX,
   ShieldCheck,
   ShieldEllipsis,
   ShieldOff,
@@ -120,6 +122,15 @@ export const AUDIT_LABELS: Record<
     icon: ShieldEllipsis,
     tone: "warning",
   },
+  "tenant.email_configured": { label: "Email delivery configured", icon: Mail, tone: "warning" },
+  "tenant.email_removed": { label: "Email delivery removed", icon: MailX, tone: "danger" },
+  "auth.password_reset_requested": {
+    label: "Password reset requested",
+    icon: KeyRound,
+    tone: "neutral",
+  },
+  "auth.session_revoked": { label: "Session ended", icon: LogOut, tone: "neutral" },
+  "auth.sessions_revoked": { label: "Signed out everywhere", icon: LogOut, tone: "warning" },
 };
 
 export function auditLabel(action: string) {

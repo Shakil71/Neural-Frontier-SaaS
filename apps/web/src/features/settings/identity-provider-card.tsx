@@ -281,7 +281,7 @@ export function IdentityProviderCard({ sharedConfigured }: { sharedConfigured: b
     <Card>
       <CardHeader
         title="Single sign-on"
-        description="Where your people prove who they are. Neural Frontier never handles passwords."
+        description="Sign in through your organisation’s identity provider (OIDC), alongside or instead of built-in passwords."
         action={<Fingerprint className="size-4 text-subtle" aria-hidden />}
       />
       <CardBody className="space-y-4">

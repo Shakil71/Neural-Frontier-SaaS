@@ -28,7 +28,9 @@ integration/API · `OSS` licensed open-source component embedded or operated by 
 | SCIM 2.0 user provisioning (Entra ID, Okta)                                                                                 | Native     | ✅ Built (2c) |
 | SAML 2.0 SSO, SCIM groups                                                                                                   | Native     | ⬜ Phase 2    |
 | Built-in accounts: passwords, authenticator-app two-step sign-in, recovery codes, set-up/reset links, tenant sign-in policy | Native     | ✅ Built (3a) |
-| Passkeys / WebAuthn, password-reset email                                                                                   | Native     | ⬜ Phase 3b   |
+| Email delivery (own SMTP client), "Forgot password?", emailed links                                                         | Native     | ✅ Built (3b) |
+| Sessions: list and end your own; admins sign people out everywhere                                                          | Native     | ✅ Built (3b) |
+| Passkeys / WebAuthn (needs a domain name)                                                                                   | Native     | ⬜ Phase 3c   |
 | Neural Frontier as an OIDC provider (replaces Keycloak)                                                                     | Native     | ⬜ Phase 3c   |
 | Linux inventory agent (Go) and Servers page                                                                                 | Native     | ✅ Built (2d) |
 | Custom roles, ABAC conditions, JIT elevation, access reviews                                                                | Native     | ⬜ Phase 2–5  |

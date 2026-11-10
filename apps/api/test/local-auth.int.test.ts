@@ -477,3 +477,32 @@ describe("my account", () => {
     await me.post("/api/v1/me/security/two-factor/setup").expect(409);
   });
 });
+
+describe("moving off the shared identity server", () => {
+  it("tells the sign-in screen whether shared single sign-on exists", async () => {
+    const res = await request(t.http).get("/api/v1/auth/options").expect(200);
+    expect(res.body).toEqual({ sharedSso: false });
+  });
+
+  it("counts who can already sign in without it, owners first", async () => {
+    const auditor = await signIn(t, f.tenantId, f.auditor);
+    const before = await auditor.get("/api/v1/tenant/sign-in-policy/readiness").expect(200);
+    expect(before.body).toMatchObject({
+      owners: 1,
+      ownersWithPassword: 0,
+      sharedSsoConfigured: false,
+      ownProvider: false,
+    });
+    expect(before.body.withPassword).toBeGreaterThan(0);
+    expect(before.body.withTwoFactor).toBeGreaterThan(0);
+    expect(before.body.people).toBeGreaterThanOrEqual(before.body.withPassword);
+
+    const owner = await signIn(t, f.tenantId, f.owner);
+    await owner.put("/api/v1/me/security/password").send({ newPassword: GOOD }).expect(200);
+    const after = await auditor.get("/api/v1/tenant/sign-in-policy/readiness").expect(200);
+    expect(after.body.ownersWithPassword).toBe(1);
+    expect(after.body.withPassword).toBe(before.body.withPassword + 1);
+    const member = await signIn(t, f.tenantId, f.member);
+    await member.get("/api/v1/tenant/sign-in-policy/readiness").expect(403);
+  });
+});

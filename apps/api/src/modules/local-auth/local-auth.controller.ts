@@ -91,6 +91,13 @@ export class SignInController {
     };
   }
 
+  /** What the sign-in screen offers before an email is entered. */
+  @Public()
+  @Get("options")
+  options() {
+    return this.local.options();
+  }
+
   /** Which ways of signing in to offer for an email (decided by its domain). */
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -378,6 +385,13 @@ export class SignInPolicyController {
   @RequirePermission("tenant.read")
   get(@CurrentPrincipal() p: Principal) {
     return this.local.policy(p.tenantId);
+  }
+
+  /** Who can already sign in without the deployment-wide provider. */
+  @Get("readiness")
+  @RequirePermission("tenant.read")
+  readiness(@CurrentPrincipal() p: Principal) {
+    return this.local.readiness(p.tenantId);
   }
 
   @Put()

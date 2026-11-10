@@ -189,6 +189,22 @@ apps must trust `/etc/pki/tls/neural-frontier/selfsigned.crt`. With a domain and
 they work out of the box. The token signing key is created on first use and sealed with
 `NF_DATA_KEY`: keep that key backed up, like the database.
 
+## Retiring Keycloak (Phase 3c-3)
+
+Built-in sign-in (3a) replaces the shared Keycloak. Steps:
+
+1. Each owner adds a password: **My account → Security & sign-in** (needs a fresh sign-in).
+   **Organisation → Built-in sign-in** shows how many owners and people are ready.
+2. Check: `sudo /usr/local/lib/neural-frontier/retire-keycloak.sh --check`. It lists every
+   organisation that would lose access, and changes nothing.
+3. Switch: `sudo /usr/local/lib/neural-frontier/retire-keycloak.sh`. It refuses while anyone would
+   be locked out. It then backs up `api.env`, clears the `NF_OIDC_*` settings, restarts the API,
+   and stops and disables Keycloak (its data is kept).
+4. Undo at any time: `sudo /usr/local/lib/neural-frontier/retire-keycloak.sh --undo`.
+
+Organisations that connected their own identity provider (Organisation → Single sign-on) are
+unaffected. After the switch, the sign-in screen no longer offers the shared single sign-on.
+
 ## Backups
 
 ```bash

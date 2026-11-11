@@ -160,23 +160,33 @@ export function findings(input: {
     l.scope === "public" || (l.scope === "all" && publicHost);
 
   // Firewall
+  const windows = firewall.kind === "windows";
   if ((!firewall.active || firewall.kind === "none") && networked.length > 0) {
+    const services = `${networked.length} network ${networked.length === 1 ? "service accepts" : "services accept"} connections`;
     out.push({
       key: "firewall.none",
       severity: publicHost ? "high" : "medium",
-      title: "No firewall is running",
-      detail: `${networked.length} network ${networked.length === 1 ? "service accepts" : "services accept"} connections and nothing on the host filters them.`,
-      remedy:
-        "Turn on the distribution's firewall (firewalld or ufw) and allow only the ports that must be reachable.",
+      title: windows
+        ? "Windows Firewall is off for the connected network"
+        : "No firewall is running",
+      detail: windows
+        ? `The ${firewall.zones.join(" and ")} profile is off. ${services} and nothing on the host filters them.`
+        : `${services} and nothing on the host filters them.`,
+      remedy: windows
+        ? "Turn Windows Firewall on for every profile (Windows Security → Firewall & network protection)."
+        : "Turn on the distribution's firewall (firewalld or ufw) and allow only the ports that must be reachable.",
     });
   } else if (firewall.active && firewall.defaultAllow) {
     out.push({
       key: "firewall.default_allow",
       severity: "medium",
       title: "The firewall lets everything in by default",
-      detail: `${firewall.kind} accepts incoming traffic that no rule blocks, so it filters very little.`,
-      remedy:
-        "Set the default incoming policy to deny (ufw default deny incoming, or move interfaces out of the firewalld 'trusted' zone).",
+      detail: windows
+        ? `Windows Firewall allows inbound connections that no rule blocks on the ${firewall.zones.join(" and ")} profile, so it filters very little.`
+        : `${firewall.kind} accepts incoming traffic that no rule blocks, so it filters very little.`,
+      remedy: windows
+        ? "Set inbound connections back to Block for that profile (Windows Defender Firewall → Advanced settings → Properties)."
+        : "Set the default incoming policy to deny (ufw default deny incoming, or move interfaces out of the firewalld 'trusted' zone).",
     });
   }
 
@@ -207,8 +217,9 @@ export function findings(input: {
       severity,
       title: `${name} (${l.proto}/${l.port}) is reachable from ${where}`,
       detail: `Listening on ${l.address}${l.process ? ` (${l.process})` : l.user ? ` (user ${l.user})` : ""}. ${how}`,
-      remedy:
-        "Bind the service to 127.0.0.1 or a private interface, or allow the port only from the hosts that need it.",
+      remedy: windows
+        ? "Stop the service if it isn't needed, or limit its firewall rule to the addresses that need it (Remote IP address scope)."
+        : "Bind the service to 127.0.0.1 or a private interface, or allow the port only from the hosts that need it.",
     });
   }
 
@@ -222,7 +233,7 @@ export function findings(input: {
         severity: "high",
         title: "SSH accepts accounts with empty passwords",
         detail: "PermitEmptyPasswords is yes.",
-        remedy: "Set PermitEmptyPasswords no in /etc/ssh/sshd_config and reload sshd.",
+        remedy: `Set PermitEmptyPasswords no in ${windows ? "%ProgramData%\\ssh\\sshd_config" : "/etc/ssh/sshd_config"} and restart sshd.`,
       });
     }
     if (ssh.permitRootLogin === "yes") {

@@ -50,14 +50,16 @@ the Admin Center (ADR 0010). The outline below keeps its numbering.
 
 ## Phase 4 — Infrastructure (formerly outline item 3)
 
-Delivered in slices. **4a** turns the Linux agent's view of the network into findings.
+Delivered in slices. **4a** turns the Linux agent's view of the network into findings, **4b**
+adds patch compliance, **4c** brings the same agent to Windows computers and servers.
 
-| Pri | Item                                                                                     | Acceptance criteria                                  | Status                                                                                                  |
-| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| P0  | Network exposure: listening ports, host firewall, SSH posture; findings; accept the risk | Parsers unit-tested; analysis unit-tested; API + E2E | 4a: built and deployed; verified on the production host under the hardened sandbox                      |
-| P1  | Patch compliance: pending security updates per server                                    | Matches `dnf updateinfo` / `apt` on test hosts       | 4b: built; dnf checked on the production host under the sandbox; the 4b binary is verified after deploy |
-| P1  | Outside-in exposure check (connect from Neural Frontier to the server's addresses)       | Confirms or refutes each "reachable" finding         | 4c: needs a design that can't be used for port scanning, and a vantage point outside the host           |
-| P2  | Cloud inventory (AWS/Azure/GCP), VPN and network devices                                 | Needs accounts to test against                       | Later                                                                                                   |
+| Pri | Item                                                                                                                      | Acceptance criteria                                                     | Status                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| P0  | Network exposure: listening ports, host firewall, SSH posture; findings; accept the risk                                  | Parsers unit-tested; analysis unit-tested; API + E2E                    | 4a: built and deployed; verified on the production host under the hardened sandbox                      |
+| P1  | Patch compliance: pending security updates per server                                                                     | Matches `dnf updateinfo` / `apt` on test hosts                          | 4b: built; dnf checked on the production host under the sandbox; the 4b binary is verified after deploy |
+| P0  | Windows agent: inventory, Windows Firewall, Defender/BitLocker/RDP/SMB1/UAC posture, Windows Update; PowerShell installer | Real Windows host report validates; service start/stop in CI; API + E2E | 4c: built; ran on a Windows 10 host; service and elevated run checked in CI                             |
+| P1  | Outside-in exposure check (connect from Neural Frontier to the server's addresses)                                        | Confirms or refutes each "reachable" finding                            | 4d: needs a design that can't be used for port scanning, and a vantage point outside the host           |
+| P2  | Cloud inventory (AWS/Azure/GCP), VPN and network devices                                                                  | Needs accounts to test against                                          | Later                                                                                                   |
 
 ## Phase 3 – 10 (outline; detailed at each phase gate)
 

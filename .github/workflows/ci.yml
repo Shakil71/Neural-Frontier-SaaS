@@ -179,20 +179,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: agents/linux/go.mod
+          go-version-file: agents/nf-agent/go.mod
           cache: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - name: gofmt
-        working-directory: agents/linux
+        working-directory: agents/nf-agent
         run: test -z "$(gofmt -l .)" || { gofmt -d .; echo "::error::run gofmt"; exit 1; }
       - name: go vet and tests
-        working-directory: agents/linux
-        run: go vet ./... && go test -race -count=1 ./...
+        working-directory: agents/nf-agent
+        run: go vet ./... && GOOS=windows go vet ./... && go test -race -count=1 ./...
       - name: Build static binaries (amd64, arm64)
-        working-directory: agents/linux
+        working-directory: agents/nf-agent
         run: |
           for arch in amd64 arm64; do
             CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w -X main.version=ci-${GITHUB_SHA::12}" -o "dist/nf-agent-linux-$arch" .
@@ -202,17 +202,88 @@ jobs:
       - run: npm run build:packages
       - name: Real inventory from this runner matches the API contract
         run: |
-          agents/linux/dist/nf-agent-linux-amd64 once > inventory.json
+          agents/nf-agent/dist/nf-agent-linux-amd64 once > inventory.json
           node tools/validate-inventory.mjs inventory.json
+
+  agent-windows:
+    name: Windows agent (Go tests, real inventory vs contract, Windows service)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: agents/nf-agent/go.mod
+          cache: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: go vet and tests (Windows build)
+        working-directory: agents/nf-agent
+        run: |
+          go vet ./...
+          if ($LASTEXITCODE) { exit 1 }
+          go test -count=1 ./...
+          if ($LASTEXITCODE) { exit 1 }
+      - name: Build (amd64, arm64)
+        working-directory: agents/nf-agent
+        run: |
+          $env:CGO_ENABLED = '0'
+          $env:GOOS = 'windows'
+          foreach ($arch in 'amd64', 'arm64') {
+            $env:GOARCH = $arch
+            go build -trimpath -ldflags "-s -w -X main.version=ci-$($env:GITHUB_SHA.Substring(0, 12))" -o "dist/nf-agent-windows-$arch.exe" .
+            if ($LASTEXITCODE) { exit 1 }
+          }
+          Get-ChildItem dist
+      - run: npm ci
+      - run: npm run build:packages
+      # The runner is elevated, like the LocalSystem service, so BitLocker, Secure Boot and
+      # process owners are read the way they are in production.
+      - name: Real inventory from this runner matches the API contract
+        run: |
+          cmd /c "agents\nf-agent\dist\nf-agent-windows-amd64.exe once > inventory.json"
+          if ($LASTEXITCODE) { exit 1 }
+          node tools/validate-inventory.mjs inventory.json
+          if ($LASTEXITCODE) { exit 1 }
+      - name: Runs as a Windows service (starts, reports, stops on request)
+        run: |
+          $data = Join-Path $env:ProgramData 'NeuralFrontier'
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          # A credential for a server that isn't there: the service must start, collect, log the
+          # failed report and keep running until told to stop.
+          '{"server":"https://127.0.0.1:9","serverId":"00000000-0000-0000-0000-000000000000","token":"nfa_ci","intervalSeconds":300}' |
+            Set-Content -Encoding ascii -Path (Join-Path $data 'agent.json')
+          $exe = (Resolve-Path agents/nf-agent/dist/nf-agent-windows-amd64.exe).Path
+          New-Service -Name nf-agent -BinaryPathName "`"$exe`" run" -StartupType Manual | Out-Null
+          Start-Service -Name nf-agent
+          (Get-Service nf-agent).WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+          $log = Join-Path $data 'agent.log'
+          $deadline = (Get-Date).AddMinutes(10)
+          while (-not ((Test-Path $log) -and (Select-String -Path $log -Pattern 'report failed' -Quiet))) {
+            if ((Get-Date) -gt $deadline) { Get-Content $log -ErrorAction SilentlyContinue; throw 'the service logged no report attempt' }
+            if ((Get-Service nf-agent).Status -ne 'Running') { Get-Content $log -ErrorAction SilentlyContinue; throw 'the service stopped by itself' }
+            Start-Sleep -Seconds 5
+          }
+          Get-Content $log
+          Stop-Service -Name nf-agent
+          (Get-Service nf-agent).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+          if (-not (Select-String -Path $log -Pattern 'stopping' -Quiet)) { throw 'the service did not log a clean stop' }
+          sc.exe delete nf-agent | Out-Null
 
   # Single required status check for branch protection and for deploy.yml.
   ci-passed:
     name: CI passed
     if: always()
-    needs: [quality, integration, e2e, supply-chain, agent]
+    needs: [quality, integration, e2e, supply-chain, agent, agent-windows]
     runs-on: ubuntu-latest
     steps:
       - run: |
           [[ "${{ needs.quality.result }}" == success && "${{ needs.integration.result }}" == success && \
-             "${{ needs.e2e.result }}" == success && "${{ needs.supply-chain.result }}" == success && "${{ needs.agent.result }}" == success ]] \
+             "${{ needs.e2e.result }}" == success && "${{ needs.supply-chain.result }}" == success && "${{ needs.agent.result }}" == success && \
+             "${{ needs['agent-windows'].result }}" == success ]] \
             || { echo "::error::A required CI job failed"; exit 1; }

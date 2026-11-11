@@ -93,21 +93,23 @@ export const NAV: { group: string; items: NavItem[] }[] = [
         label: "Servers",
         icon: Server,
         permission: "servers.read",
-        keywords: "linux hosts machines agent inventory packages",
+        keywords: "linux windows hosts computers machines agent inventory packages programs",
       },
       {
         href: "/updates",
         label: "Updates",
         icon: PackageCheck,
         permission: "servers.read",
-        keywords: "patches patch compliance security updates reboot kernel dnf apt",
+        keywords:
+          "patches patch compliance security updates reboot kernel dnf apt windows update kb",
       },
       {
         href: "/findings",
         label: "Security findings",
         icon: ShieldAlert,
         permission: "servers.read",
-        keywords: "exposure findings firewall ports ssh open network risk updates",
+        keywords:
+          "exposure findings firewall ports ssh open network risk updates windows defender antivirus bitlocker rdp",
       },
     ],
   },

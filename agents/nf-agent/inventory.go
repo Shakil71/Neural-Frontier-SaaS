@@ -3,15 +3,16 @@ package main
 // Inventory is the report sent to POST /api/agent/v1/inventory. Field names and limits
 // match AgentInventorySchema in packages/contracts/src/servers.ts.
 type Inventory struct {
-	AgentVersion   string      `json:"agentVersion"`
-	CollectedAt    string      `json:"collectedAt"`
-	Hostname       string      `json:"hostname"`
-	MachineID      string      `json:"machineId"`
-	OS             OSInfo      `json:"os"`
-	CPU            CPUInfo     `json:"cpu"`
-	Memory         MemoryInfo  `json:"memory"`
-	UptimeSeconds  int64       `json:"uptimeSeconds"`
-	LoadAverage    [3]float64  `json:"loadAverage"`
+	AgentVersion  string     `json:"agentVersion"`
+	CollectedAt   string     `json:"collectedAt"`
+	Hostname      string     `json:"hostname"`
+	MachineID     string     `json:"machineId"`
+	OS            OSInfo     `json:"os"`
+	CPU           CPUInfo    `json:"cpu"`
+	Memory        MemoryInfo `json:"memory"`
+	UptimeSeconds int64      `json:"uptimeSeconds"`
+	// Null on Windows, which has no load average.
+	LoadAverage    *[3]float64 `json:"loadAverage"`
 	Disks          []Disk      `json:"disks"`
 	Interfaces     []Interface `json:"interfaces"`
 	Services       []Service   `json:"services"`
@@ -25,6 +26,8 @@ type Inventory struct {
 	SSH       SSHConfig  `json:"ssh"`
 	// Patch compliance (agent 4b and later).
 	Updates Updates `json:"updates"`
+	// Windows security posture (Windows agent only).
+	Windows *WindowsSecurity `json:"windows,omitempty"`
 }
 
 type OSInfo struct {

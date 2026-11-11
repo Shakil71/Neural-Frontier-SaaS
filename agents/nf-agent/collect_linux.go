@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -73,32 +72,6 @@ func collectDisks() []Disk {
 	return disks
 }
 
-func collectInterfaces() []Interface {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil
-	}
-	var out []Interface
-	for _, ifc := range ifaces {
-		if ifc.Flags&net.FlagLoopback != 0 || ifc.Flags&net.FlagUp == 0 {
-			continue
-		}
-		addrs, _ := ifc.Addrs()
-		list := []string{}
-		for _, a := range addrs {
-			if len(list) >= maxAddrs {
-				break
-			}
-			list = append(list, clip(a.String(), 64))
-		}
-		out = append(out, Interface{Name: clip(ifc.Name, 64), MAC: ifc.HardwareAddr.String(), Addresses: list})
-		if len(out) >= maxIfaces {
-			break
-		}
-	}
-	return out
-}
-
 // collectPackages lists installed packages with whichever manager the distribution uses.
 func collectPackages(ctx context.Context) (manager string, pkgs []Package, hash string) {
 	if out := run(ctx, "rpm", "-qa", "--qf", "%{NAME}\t%{VERSION}-%{RELEASE}.%{ARCH}\n"); out != "" {
@@ -134,9 +107,7 @@ func Collect(ctx context.Context) Inventory {
 		disks = []Disk{}
 	}
 	ifaces := collectInterfaces()
-	if ifaces == nil {
-		ifaces = []Interface{}
-	}
+	load := parseLoadavg(readFile("/proc/loadavg"))
 	return Inventory{
 		AgentVersion: version,
 		CollectedAt:  time.Now().UTC().Format(time.RFC3339),
@@ -149,7 +120,7 @@ func Collect(ctx context.Context) Inventory {
 		CPU:            CPUInfo{Model: clip(model, 256), Cores: cores},
 		Memory:         MemoryInfo{TotalBytes: total, AvailableBytes: avail},
 		UptimeSeconds:  parseUptime(readFile("/proc/uptime")),
-		LoadAverage:    parseLoadavg(readFile("/proc/loadavg")),
+		LoadAverage:    &load,
 		Disks:          disks,
 		Interfaces:     ifaces,
 		Services:       services,

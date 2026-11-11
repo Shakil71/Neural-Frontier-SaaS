@@ -52,9 +52,12 @@ export function updateFindings(u: AgentUpdates): Draft[] {
   if (security.length > 0) {
     const named = security
       .slice(0, 3)
-      .map((p) =>
-        p.advisory ? `${p.name} (${p.advisory}${p.severity ? `, ${p.severity}` : ""})` : p.name,
-      )
+      .map((p) => {
+        // Windows update titles already name their KB article.
+        const advisory = p.advisory && !p.name.includes(p.advisory) ? p.advisory : "";
+        const extra = [advisory, p.severity].filter(Boolean).join(", ");
+        return extra ? `${p.name} (${extra})` : p.name;
+      })
       .join(", ");
     const more = security.length > 3 ? ` and ${security.length - 3} more` : "";
     out.push({
@@ -63,9 +66,11 @@ export function updateFindings(u: AgentUpdates): Draft[] {
       title: `${plural(security.length, "security update is", "security updates are")} waiting`,
       detail: `${named}${more}.`,
       remedy:
-        u.manager === "dpkg"
-          ? "Install them with apt upgrade (or unattended-upgrades), then restart affected services."
-          : "Install them with dnf upgrade --security, then restart affected services or reboot if the kernel changed.",
+        u.manager === "windows-update"
+          ? "Install them with Windows Update (Settings → Windows Update), then restart when it asks."
+          : u.manager === "dpkg"
+            ? "Install them with apt upgrade (or unattended-upgrades), then restart affected services."
+            : "Install them with dnf upgrade --security, then restart affected services or reboot if the kernel changed.",
     });
   }
   if (u.rebootRequired) {
@@ -77,7 +82,10 @@ export function updateFindings(u: AgentUpdates): Draft[] {
         u.newestKernel && u.newestKernel !== u.runningKernel
           ? `Running kernel ${u.runningKernel}; ${u.newestKernel} is installed but not in use, so its fixes aren't active.`
           : "The system reports that updates installed since the last boot need a restart.",
-      remedy: "Reboot the server in a maintenance window.",
+      remedy:
+        u.manager === "windows-update"
+          ? "Restart the computer in a maintenance window."
+          : "Reboot the server in a maintenance window.",
     });
   }
   const age = metadataAgeDays(u);
@@ -85,13 +93,18 @@ export function updateFindings(u: AgentUpdates): Draft[] {
     out.push({
       key: "updates.stale_metadata",
       severity: "low",
-      title: `Package information is ${age} days old`,
+      title:
+        u.manager === "windows-update"
+          ? `Windows Update last checked ${age} days ago`
+          : `Package information is ${age} days old`,
       detail:
         "Updates published since then aren't known to this server, so it may look more up to date than it is.",
       remedy:
-        u.manager === "dpkg"
-          ? "Make sure apt's daily update runs (apt-daily.timer) and can reach its mirrors."
-          : "Make sure dnf-makecache.timer is enabled and can reach its repositories.",
+        u.manager === "windows-update"
+          ? "Make sure Windows Update checks automatically and can reach Microsoft Update or your update server."
+          : u.manager === "dpkg"
+            ? "Make sure apt's daily update runs (apt-daily.timer) and can reach its mirrors."
+            : "Make sure dnf-makecache.timer is enabled and can reach its repositories.",
     });
   }
   return out;

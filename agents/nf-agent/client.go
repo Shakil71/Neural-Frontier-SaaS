@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -56,12 +57,12 @@ type apiError struct {
 
 func (e *apiError) Error() string { return fmt.Sprintf("server answered %d: %s", e.Status, e.Body) }
 
-func postJSON(c *http.Client, url, token string, body any, out any) error {
+func postJSON(ctx context.Context, c *http.Client, url, token string, body any, out any) error {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}

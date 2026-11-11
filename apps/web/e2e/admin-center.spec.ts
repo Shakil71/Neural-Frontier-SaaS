@@ -192,10 +192,10 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
   await page.goto("/servers");
   await page.getByRole("button", { name: "Add server" }).first().click();
   await page
-    .getByRole("dialog", { name: "Add a Linux server" })
+    .getByRole("dialog", { name: "Add a server or computer" })
     .getByRole("button", { name: "Create key" })
     .click();
-  const done = page.getByRole("dialog", { name: "Run this on the server" });
+  const done = page.getByRole("dialog", { name: "Run this on the computer" });
   const command = (await done.locator("code").textContent()) ?? "";
   const key = /--key (nfe_[A-Za-z0-9_-]+)/.exec(command)?.[1] ?? "";
   expect(key).not.toBe("");
@@ -386,6 +386,165 @@ test("an administrator adds a server; the agent's report appears in the Admin Ce
   // Recorded in the audit log.
   await page.goto("/audit");
   await expect(page.getByRole("row", { name: "View Finding accepted event" })).toBeVisible();
+});
+
+test("a Windows computer reports its protection settings and gets findings", async ({
+  page,
+  request,
+}) => {
+  await signInAs(page, "ada.owner@acme.example");
+  await page.goto("/servers");
+  await page.getByRole("button", { name: "Add server" }).first().click();
+  await page
+    .getByRole("dialog", { name: "Add a server or computer" })
+    .getByRole("button", { name: "Create key" })
+    .click();
+  const done = page.getByRole("dialog", { name: "Run this on the computer" });
+  await done.getByRole("tab", { name: "Windows" }).click();
+  await expect(
+    done.getByText("In PowerShell opened as Administrator", { exact: false }),
+  ).toBeVisible();
+  const command = (await done.locator("code").textContent()) ?? "";
+  expect(command).toContain("/api/agent/v1/install.ps1");
+  const key = /-Key (nfe_[A-Za-z0-9_-]+)/.exec(command)?.[1] ?? "";
+  expect(key).not.toBe("");
+  await page.screenshot({ path: "test-results/screenshots/27-add-windows-light.png" });
+  await done.getByRole("button", { name: "Done" }).click();
+
+  const machineId = "e2e0000000000000000000000000b001";
+  const enrolled = await request.post("/api/agent/v1/enroll", {
+    data: { enrollmentKey: key, machineId, hostname: "WS-0042" },
+  });
+  expect(enrolled.status()).toBe(200);
+  const { agentToken } = (await enrolled.json()) as { agentToken: string };
+  const now = new Date().toISOString();
+  const report = await request.post("/api/agent/v1/inventory", {
+    headers: { Authorization: `Bearer ${agentToken}` },
+    data: {
+      agentVersion: "e2e",
+      collectedAt: now,
+      hostname: "WS-0042",
+      machineId,
+      os: {
+        id: "windows",
+        name: "Windows 11 Pro",
+        version: "24H2",
+        prettyName: "Windows 11 Pro 24H2",
+        kernel: "10.0.26100.4652",
+        arch: "amd64",
+      },
+      cpu: { model: "Intel(R) Core(TM) i7-1365U", cores: 12 },
+      memory: { totalBytes: 32 * 2 ** 30, availableBytes: 18 * 2 ** 30 },
+      uptimeSeconds: 7200,
+      loadAverage: null,
+      disks: [
+        {
+          mount: "C:\\",
+          device: "C:",
+          fsType: "NTFS",
+          sizeBytes: 512 * 2 ** 30,
+          usedBytes: 230 * 2 ** 30,
+        },
+      ],
+      interfaces: [{ name: "Wi-Fi", mac: "a4:c3:f0:12:34:56", addresses: ["192.168.10.42/24"] }],
+      services: [{ name: "TermService", description: "Remote Desktop Services" }],
+      packages: [{ name: "7-Zip 23.01 (x64)", version: "23.01" }],
+      packageManager: "windows",
+      packagesHash: "c".repeat(64),
+      packageCount: 1,
+      listeners: [
+        {
+          proto: "tcp",
+          address: "0.0.0.0",
+          port: 3389,
+          user: "",
+          process: "svchost (TermService)",
+        },
+      ],
+      firewall: {
+        kind: "windows",
+        active: true,
+        rulesKnown: true,
+        defaultAllow: false,
+        zones: ["private"],
+        allowed: [{ proto: "tcp", from: 3389, to: 3389, scope: "any" }],
+      },
+      ssh: {
+        present: false,
+        ports: [],
+        permitRootLogin: "",
+        passwordAuthentication: "",
+        kbdInteractiveAuthentication: "",
+        usePam: "",
+        permitEmptyPasswords: "",
+      },
+      updates: {
+        status: "ok",
+        error: "",
+        manager: "windows-update",
+        checkedAt: now,
+        metadataAt: now,
+        pending: [
+          {
+            name: "2026-11 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5070001)",
+            arch: "",
+            version: "KB5070001",
+            security: true,
+            severity: "Critical",
+            advisory: "KB5070001",
+          },
+        ],
+        rebootRequired: false,
+        runningKernel: "10.0.26100.4652",
+        newestKernel: "",
+      },
+      windows: {
+        server: false,
+        antivirus: [{ name: "Windows Defender", enabled: true, upToDate: true }],
+        defender: {
+          antivirusEnabled: true,
+          realTimeProtection: true,
+          tamperProtection: true,
+          signaturesUpdatedAt: now,
+        },
+        bitlocker: "off",
+        systemDrive: "C:",
+        rdp: { enabled: true, nla: false, port: 3389 },
+        smb1: false,
+        uac: true,
+        guestEnabled: false,
+        secureBoot: true,
+        admins: ["WS-0042\\Administrator", "ACME\\Domain Admins"],
+        firewallProfiles: [
+          { name: "domain", active: false, enabled: true, defaultInboundAllow: false },
+          { name: "private", active: true, enabled: true, defaultInboundAllow: false },
+          { name: "public", active: false, enabled: true, defaultInboundAllow: false },
+        ],
+      },
+    },
+  });
+  expect(report.status()).toBe(204);
+
+  await page.reload();
+  await page.getByRole("button", { name: "Open WS-0042" }).click();
+  const sheet = page.getByRole("dialog", { name: "WS-0042" });
+  await expect(sheet.getByText("Windows 11 Pro 24H2")).toBeVisible();
+  await expect(sheet.getByText("Build")).toBeVisible();
+  await sheet.getByRole("tab", { name: /Security/ }).click();
+  const posture = sheet.getByRole("region", { name: "Windows protection" });
+  await expect(posture.getByText("Microsoft Defender")).toBeVisible();
+  await expect(posture.getByText("Not encrypted")).toBeVisible();
+  await expect(posture.getByText("Without Network Level Authentication")).toBeVisible();
+  await expect(posture.getByText("ACME\\Domain Admins")).toBeVisible();
+  await expect(sheet.getByText("Remote Desktop accepts connections before sign-in")).toBeVisible();
+  await expect(sheet.getByText("The system drive (C:) isn't encrypted")).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/28-windows-security-light.png" });
+  await posture.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/screenshots/28b-windows-protection-light.png" });
+  await sheet.getByRole("tab", { name: /Updates/ }).click();
+  await expect(sheet.getByText("KB5070001", { exact: false }).first()).toBeVisible();
+  await expect(sheet.getByText("Install them with Windows Update", { exact: false })).toBeVisible();
+  await page.screenshot({ path: "test-results/screenshots/29-windows-updates-light.png" });
 });
 
 /** RFC 6238 code, computed independently of the app (base32 seed → HMAC-SHA1). */

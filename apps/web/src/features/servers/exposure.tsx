@@ -15,6 +15,7 @@ import {
   BrickWall,
   CircleCheck,
   KeyRound,
+  MonitorSmartphone,
   RadioTower,
   RotateCcw,
   ShieldAlert,
@@ -32,6 +33,7 @@ import { Badge, FieldError, Label, Textarea } from "@/components/ui/primitives";
 import { api, ApiRequestError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatDateTime, formatNumber } from "@/lib/format";
+import { WindowsPosture } from "./windows";
 
 /** Query keys the exposure views invalidate after a change. */
 export const exposureKeys = {
@@ -81,6 +83,7 @@ const FIREWALL_NAMES: Record<string, string> = {
   ufw: "ufw",
   nftables: "nftables",
   iptables: "iptables",
+  windows: "Windows Firewall",
   none: "None",
 };
 
@@ -336,16 +339,21 @@ export function ExposurePanel({ s, canManage }: { s: ServerDetail; canManage: bo
     (e.ssh.kbdInteractiveAuthentication === "yes" && e.ssh.usePam === "yes")
       ? "passwords and keys"
       : "keys only";
+  const win = e.windows;
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
         <Tile
           icon={BrickWall}
           label="Firewall"
-          value={fw.active ? FIREWALL_NAMES[fw.kind]! : "None running"}
+          value={
+            fw.active ? FIREWALL_NAMES[fw.kind]! : fw.kind === "windows" ? "Off" : "None running"
+          }
           sub={
             !fw.active
-              ? "Nothing filters incoming traffic"
+              ? fw.kind === "windows"
+                ? `Off for the ${fw.zones.join(", ") || "connected"} network`
+                : "Nothing filters incoming traffic"
               : !fw.rulesKnown
                 ? "Running; rules not readable by the agent"
                 : fw.defaultAllow
@@ -354,14 +362,32 @@ export function ExposurePanel({ s, canManage }: { s: ServerDetail; canManage: bo
           }
           tone={fw.active && !fw.defaultAllow ? "good" : "bad"}
         />
-        <Tile
-          icon={KeyRound}
-          label="SSH"
-          value={e.ssh.present ? `Port ${e.ssh.ports.join(", ")}` : "Not configured"}
-          sub={
-            e.ssh.present ? `root: ${e.ssh.permitRootLogin} · ${sshAuth}` : "No sshd_config found"
-          }
-        />
+        {win && !e.ssh.present ? (
+          <Tile
+            icon={MonitorSmartphone}
+            label="Remote access"
+            value={win.rdp.enabled ? "Remote Desktop on" : "Remote Desktop off"}
+            sub={
+              win.rdp.enabled
+                ? `Port ${win.rdp.port} · ${win.rdp.nla === false ? "no NLA" : "NLA required"}`
+                : "No OpenSSH server"
+            }
+            tone={win.rdp.enabled && win.rdp.nla === false ? "bad" : undefined}
+          />
+        ) : (
+          <Tile
+            icon={KeyRound}
+            label="SSH"
+            value={e.ssh.present ? `Port ${e.ssh.ports.join(", ")}` : "Not configured"}
+            sub={
+              e.ssh.present
+                ? win
+                  ? `OpenSSH server · ${sshAuth}`
+                  : `root: ${e.ssh.permitRootLogin} · ${sshAuth}`
+                : "No sshd_config found"
+            }
+          />
+        )}
         <Tile
           icon={RadioTower}
           label="Listening"
@@ -379,8 +405,10 @@ export function ExposurePanel({ s, canManage }: { s: ServerDetail; canManage: bo
         </h3>
         {e.findings.length === 0 ? (
           <p className="flex items-center gap-2 rounded-xl border border-success/30 bg-success-soft px-3.5 py-3 text-[12.5px]">
-            <CircleCheck className="size-4 text-success" aria-hidden /> Nothing to fix: no sensitive
-            service is reachable and SSH is locked down.
+            <CircleCheck className="size-4 text-success" aria-hidden />
+            {win
+              ? "Nothing to fix: no sensitive service is reachable and Windows protections are on."
+              : "Nothing to fix: no sensitive service is reachable and SSH is locked down."}
           </p>
         ) : (
           <ul className="space-y-2.5">
@@ -396,6 +424,8 @@ export function ExposurePanel({ s, canManage }: { s: ServerDetail; canManage: bo
           </ul>
         )}
       </section>
+
+      {win && <WindowsPosture w={win} collectedAt={s.lastSeenAt} />}
 
       <section aria-label="Listening ports">
         <h3 className="mb-2.5 text-[13px] font-semibold">Listening ports</h3>
@@ -443,9 +473,9 @@ export function ExposurePanel({ s, canManage }: { s: ServerDetail; canManage: bo
           </div>
         )}
         <p className="mt-2.5 text-[11.5px] text-subtle">
-          Only this host&apos;s firewall is analysed. A cloud security group or an upstream firewall
-          may block more, and container runtimes such as Docker can publish ports that bypass
-          firewalld.
+          {win
+            ? "Only Windows Firewall's allow rules are analysed: a block rule may still close a port shown as allowed, and a network firewall may block more."
+            : "Only this host's firewall is analysed. A cloud security group or an upstream firewall may block more, and container runtimes such as Docker can publish ports that bypass firewalld."}
         </p>
       </section>
     </div>

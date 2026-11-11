@@ -76,7 +76,7 @@ export function Exposure() {
             }
           >
             {d!.serversTotal === 0
-              ? "Add a Linux server with the agent; its listening ports, firewall and SSH settings are analysed here."
+              ? "Add a server or computer with the agent; its listening ports, firewall, SSH and Windows protection settings are analysed here."
               : "Your servers run an agent from before exposure reporting. Run the install command on them again to update; findings appear after the next report."}
           </EmptyState>
         </Card>

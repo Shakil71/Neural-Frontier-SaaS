@@ -40,11 +40,13 @@ log "agent build"
 if command -v go >/dev/null; then
   mkdir -p "$SRC/agent-dist"
   for arch in amd64 arm64; do
-    (cd "$SRC/agents/linux" && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+    (cd "$SRC/agents/nf-agent" && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
       go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_ID}" -o "$SRC/agent-dist/nf-agent-linux-$arch" .)
+    (cd "$SRC/agents/nf-agent" && CGO_ENABLED=0 GOOS=windows GOARCH="$arch" \
+      go build -trimpath -ldflags "-s -w -X main.version=${RELEASE_ID}" -o "$SRC/agent-dist/nf-agent-windows-$arch.exe" .)
   done
 else
-  log "go is not installed: the release ships without the Linux agent (run install.sh)"
+  log "go is not installed: the release ships without the agent (run install.sh)"
 fi
 
 log "staging release $RELEASE_ID"

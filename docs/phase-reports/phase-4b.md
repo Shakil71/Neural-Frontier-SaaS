@@ -51,9 +51,11 @@ No migration: the patch state is part of the stored inventory, and acceptances r
 
 ## Not claimed
 
-- **The 4b agent binary itself hasn't run on a real host yet.** Running a pre-release build on
-  production was rightly refused, so it will be checked with the released binary after
-  deployment, as in 4a.
+- **Verified after deploy (2026-11-11, release 20261111135409-e7894c9f808c):** the released
+  binary ran on the production host under the service's sandbox. dnf answered from its cache
+  (0 pending), and it flagged a reboot: kernel 5.15.0-326.222.4 was running while
+  326.224.5.0.1 was installed. The VPS agent was updated to this release, its unit got
+  `ReadWritePaths=-/var/cache/dnf`, and it reports.
 - The Debian/Ubuntu path is unit-tested, and CI runs it on the Ubuntu runner without the systemd
   sandbox. It hasn't run on a Debian host under the sandbox.
 - Results are only as fresh as the package metadata, which the system's own timers refresh

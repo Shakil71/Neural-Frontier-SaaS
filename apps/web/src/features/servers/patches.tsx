@@ -25,6 +25,13 @@ const SEVERITY_TONE: Record<string, "danger" | "warning" | "primary" | "neutral"
   low: "primary",
 };
 
+const MANAGER: Record<string, string> = {
+  rpm: "dnf",
+  dpkg: "apt",
+  "windows-update": "Windows Update",
+  none: "—",
+};
+
 export function severityTone(severity: string) {
   return SEVERITY_TONE[severity.toLowerCase()] ?? "warning";
 }
@@ -116,7 +123,9 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
           <CircleAlert className="size-4 text-warning" aria-hidden />
           {u.status === "unsupported"
             ? "This distribution's package manager isn't supported yet"
-            : "The package manager couldn't be asked"}
+            : u.manager === "windows-update"
+              ? "Windows Update couldn't be asked"
+              : "The package manager couldn't be asked"}
         </p>
         {u.error && <p className="mt-1.5 font-mono text-[11.5px] text-muted">{u.error}</p>}
         <p className="mt-1.5 text-muted">
@@ -142,12 +151,16 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
         <Stat
           label="All updates"
           value={formatNumber(u.pending.length)}
-          sub={`${u.manager === "dpkg" ? "apt" : "dnf"} · checked ${formatRelative(u.checkedAt).toLowerCase()}`}
+          sub={`${MANAGER[u.manager]} · checked ${formatRelative(u.checkedAt).toLowerCase()}`}
         />
         <Stat
-          label="Reboot"
+          label={u.manager === "windows-update" ? "Restart" : "Reboot"}
           value={u.rebootRequired === null ? "—" : u.rebootRequired ? "Needed" : "Not needed"}
-          sub={u.runningKernel ? `running ${u.runningKernel}` : undefined}
+          sub={
+            u.runningKernel
+              ? `${u.manager === "windows-update" ? "build" : "running"} ${u.runningKernel}`
+              : undefined
+          }
           tone={u.rebootRequired ? "text-warning" : undefined}
         />
       </div>
@@ -170,7 +183,9 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-[13px] font-semibold">Pending updates</h3>
           <p className="text-[11.5px] text-subtle">
-            Package information from{" "}
+            {u.manager === "windows-update"
+              ? "Windows Update last checked"
+              : "Package information from"}{" "}
             {u.metadataAt ? formatDateTime(u.metadataAt) : "an unknown time"}
             {ageDays !== null && ageDays >= 1
               ? ` (${ageDays} ${ageDays === 1 ? "day" : "days"} old)`
@@ -179,8 +194,10 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
         </div>
         {u.pending.length === 0 ? (
           <p className="flex items-center gap-2 rounded-xl border border-success/30 bg-success-soft px-3.5 py-3 text-[12.5px]">
-            <PackageCheck className="size-4 text-success" aria-hidden /> Every installed package is
-            at its newest available version.
+            <PackageCheck className="size-4 text-success" aria-hidden />
+            {u.manager === "windows-update"
+              ? "Windows Update has nothing waiting to install."
+              : "Every installed package is at its newest available version."}
           </p>
         ) : (
           <>
@@ -192,7 +209,11 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
               <Input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Filter by package or advisory"
+                placeholder={
+                  u.manager === "windows-update"
+                    ? "Filter by update or KB"
+                    : "Filter by package or advisory"
+                }
                 aria-label="Filter pending updates"
                 className="pl-9"
               />
@@ -201,9 +222,9 @@ export function PatchPanel({ s, canManage }: { s: ServerDetail; canManage: boole
               {rows.slice(0, 300).map((p) => (
                 <li key={`${p.name}.${p.arch}`} className="flex items-center gap-3 px-3.5 py-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[12px]">
+                    <p className={cn("truncate text-[12px]", p.arch && "font-mono")} title={p.name}>
                       {p.name}
-                      <span className="text-subtle">.{p.arch}</span>
+                      {p.arch && <span className="text-subtle">.{p.arch}</span>}
                     </p>
                     <p className="truncate text-[11.5px] text-subtle">{p.version}</p>
                   </div>

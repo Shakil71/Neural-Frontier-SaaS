@@ -44,7 +44,7 @@ export function Updates() {
       <PageHeader
         eyebrow="Infrastructure"
         title="Updates"
-        description="Patch compliance across your servers: security updates waiting to be installed, servers that need a reboot to run an installed kernel, and package information that has gone stale. Checked hourly by each agent from the server's own package cache."
+        description="Patch compliance across your servers and Windows computers: security updates waiting to be installed, machines that need a restart to finish updating, and update information that has gone stale. Checked hourly by each agent from the local package cache or Windows Update's last scan."
       />
       {q.isError ? (
         <Card>
@@ -66,7 +66,7 @@ export function Updates() {
               </Button>
             }
           >
-            Add a Linux server with the agent; its pending updates are tracked here.
+            Add a server or computer with the agent; its pending updates are tracked here.
           </EmptyState>
         </Card>
       ) : (

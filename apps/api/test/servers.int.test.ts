@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,9 +20,11 @@ let acme: Fixture;
 let other: Fixture;
 const dist = mkdtempSync(join(tmpdir(), "nf-agent-dist-"));
 const fakeBinary = Buffer.from("#!/bin/sh\necho fake agent\n");
+const fakeExe = Buffer.from("MZ fake windows agent");
 
 beforeAll(async () => {
   writeFileSync(join(dist, "nf-agent-linux-amd64"), fakeBinary);
+  writeFileSync(join(dist, "nf-agent-windows-amd64.exe"), fakeExe);
   t = await startApp({ NF_AGENT_DIST_DIR: dist, NF_AGENT_INTERVAL_SECONDS: "300" });
   acme = await seedTenant(t, "srv");
   other = await seedTenant(t, "srv-other");
@@ -87,9 +90,12 @@ describe("enrollment keys", () => {
     const issued = await newKey(acme);
     expect(issued.key).toMatch(/^nfe_/);
     expect(issued.installCommand).toContain(`--key ${issued.key}`);
+    expect(issued.windowsInstallCommand).toContain("/api/agent/v1/install.ps1");
+    expect(issued.windowsInstallCommand).toContain(`-Key ${issued.key}`);
     const list = await auditor.get("/api/v1/agent-enrollment-keys").expect(200);
     expect(JSON.stringify(list.body)).not.toContain(issued.key);
     expect(list.body.agentAvailable).toBe(true);
+    expect(list.body.windowsAgentAvailable).toBe(true);
   });
 
   it("refuse unknown, revoked and used-up keys", async () => {
@@ -497,6 +503,190 @@ describe("patch compliance", () => {
   });
 });
 
+describe("windows hosts", () => {
+  let token: string;
+  let serverId: string;
+  const windowsReport = (overrides: Record<string, unknown> = {}) =>
+    inventory(machine(40), {
+      hostname: "WS-0042",
+      os: {
+        id: "windows",
+        name: "Windows 11 Pro",
+        version: "24H2",
+        prettyName: "Windows 11 Pro 24H2",
+        kernel: "10.0.26100.4652",
+        arch: "amd64",
+      },
+      loadAverage: null,
+      disks: [{ mount: "C:\\", device: "C:", fsType: "NTFS", sizeBytes: 100, usedBytes: 60 }],
+      interfaces: [
+        { name: "Ethernet", mac: "00:50:56:aa:bb:01", addresses: ["192.168.197.42/24"] },
+      ],
+      services: [{ name: "TermService", description: "Remote Desktop Services" }],
+      packages: [{ name: "7-Zip 23.01 (x64)", version: "23.01" }],
+      packageManager: "windows",
+      packagesHash: "b".repeat(64),
+      packageCount: 1,
+      listeners: [
+        { proto: "tcp", address: "::", port: 445, user: "", process: "System" },
+        {
+          proto: "tcp",
+          address: "0.0.0.0",
+          port: 3389,
+          user: "",
+          process: "svchost (TermService)",
+        },
+      ],
+      firewall: {
+        kind: "windows",
+        active: true,
+        rulesKnown: true,
+        defaultAllow: false,
+        zones: ["private"],
+        allowed: [{ proto: "tcp", from: 3389, to: 3389, scope: "any" }],
+      },
+      ssh: {
+        present: false,
+        ports: [],
+        permitRootLogin: "",
+        passwordAuthentication: "",
+        kbdInteractiveAuthentication: "",
+        usePam: "",
+        permitEmptyPasswords: "",
+      },
+      updates: {
+        status: "ok",
+        error: "",
+        manager: "windows-update",
+        checkedAt: new Date().toISOString(),
+        metadataAt: new Date().toISOString(),
+        pending: [
+          {
+            name: "2026-11 Cumulative Update for Windows 11 Version 24H2 (KB5070001)",
+            arch: "",
+            version: "KB5070001",
+            security: true,
+            severity: "Critical",
+            advisory: "KB5070001",
+          },
+        ],
+        rebootRequired: true,
+        runningKernel: "10.0.26100.4652",
+        newestKernel: "",
+      },
+      windows: {
+        server: false,
+        antivirus: [{ name: "Windows Defender", enabled: false, upToDate: true }],
+        defender: {
+          antivirusEnabled: true,
+          realTimeProtection: false,
+          tamperProtection: false,
+          signaturesUpdatedAt: new Date().toISOString(),
+        },
+        bitlocker: "off",
+        systemDrive: "C:",
+        rdp: { enabled: true, nla: false, port: 3389 },
+        smb1: false,
+        uac: true,
+        guestEnabled: false,
+        secureBoot: true,
+        admins: ["WS-0042\\Administrator", "ACME\\Domain Admins"],
+        firewallProfiles: [
+          { name: "domain", active: false, enabled: true, defaultInboundAllow: false },
+          { name: "private", active: true, enabled: true, defaultInboundAllow: false },
+          { name: "public", active: false, enabled: false, defaultInboundAllow: false },
+        ],
+      },
+      ...overrides,
+    });
+
+  it("reports a Windows computer's posture, exposure and updates as findings", async () => {
+    const issued = await newKey(acme, { name: "windows" });
+    const res = await enroll(issued.key, machine(40), "WS-0042").expect(200);
+    token = res.body.agentToken;
+    serverId = res.body.serverId;
+    await report(token, windowsReport()).expect(204);
+
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    const detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail).toMatchObject({
+      os: { id: "windows", prettyName: "Windows 11 Pro 24H2", kernel: "10.0.26100.4652" },
+      loadAverage: null,
+      packageManager: "windows",
+    });
+    expect(detail.exposure!.windows!.bitlocker).toBe("off");
+    expect(detail.exposure!.listeners.map((l) => [l.port, l.reach, l.service])).toEqual([
+      [445, "blocked", "SMB"],
+      [3389, "allowed", "Remote Desktop"],
+    ]);
+    expect(detail.exposure!.findings.map((f) => [f.key, f.severity])).toEqual([
+      ["windows.antivirus_off", "high"],
+      ["windows.rdp_no_nla", "high"],
+      ["port.exposed:tcp:3389", "medium"],
+      ["windows.bitlocker_off", "medium"],
+      ["windows.firewall_profile_off", "medium"],
+    ]);
+    expect(detail.patchFindings.map((f) => [f.key, f.severity])).toEqual([
+      ["updates.security", "high"],
+      ["updates.reboot_required", "medium"],
+    ]);
+    expect(detail.patchFindings[0]!.remedy).toContain("Windows Update");
+    expect(detail.findings).toEqual({ high: 3, medium: 4, low: 0 });
+
+    const fleet = FleetUpdatesSchema.parse(
+      (await admin.get("/api/v1/server-updates").expect(200)).body,
+    );
+    expect(fleet.servers.find((x) => x.serverId === serverId)).toMatchObject({
+      os: "Windows 11 Pro 24H2",
+      updates: { security: 1, urgent: 1, rebootRequired: true },
+    });
+  });
+
+  it("a Windows posture finding can be accepted, and fixing it clears it", async () => {
+    const admin = await signIn(t, acme.tenantId, acme.admin);
+    await admin
+      .put(`/api/v1/servers/${serverId}/findings/windows.bitlocker_off/acceptance`)
+      .send({ reason: "Lab machine, no data at rest" })
+      .expect(200);
+    let detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(
+      detail.exposure!.findings.find((f) => f.key === "windows.bitlocker_off")!.accepted,
+    ).toMatchObject({ reason: "Lab machine, no data at rest" });
+
+    const fixed = windowsReport();
+    Object.assign((fixed as unknown as { windows: Record<string, unknown> }).windows, {
+      antivirus: [{ name: "Windows Defender", enabled: true, upToDate: true }],
+      defender: {
+        antivirusEnabled: true,
+        realTimeProtection: true,
+        tamperProtection: true,
+        signaturesUpdatedAt: new Date().toISOString(),
+      },
+      rdp: { enabled: true, nla: true, port: 3389 },
+    });
+    await report(token, fixed).expect(204);
+    detail = ServerDetailSchema.parse(
+      (await admin.get(`/api/v1/servers/${serverId}`).expect(200)).body,
+    );
+    expect(detail.exposure!.findings.map((f) => f.key)).toEqual([
+      "port.exposed:tcp:3389",
+      "windows.bitlocker_off",
+      "windows.firewall_profile_off",
+    ]);
+  });
+
+  it("refuses malformed Windows reports", async () => {
+    const bad = windowsReport();
+    (bad as unknown as { windows: Record<string, unknown> }).windows.bitlocker = "maybe";
+    await report(token, bad).expect(400);
+    await report(token, windowsReport({ packageManager: "chocolatey" })).expect(400);
+  });
+});
+
 describe("installer", () => {
   it("serves an install script that verifies the binary checksum", async () => {
     const res = await request(t.http).get("/api/agent/v1/install.sh").expect(200);
@@ -505,6 +695,29 @@ describe("installer", () => {
     expect(res.text).toContain("checksum mismatch: refusing to install");
     expect(res.text).toContain("NoNewPrivileges=yes");
     expect(res.text).toContain("ReadWritePaths=-/var/cache/dnf");
+  });
+
+  it("serves a PowerShell installer that verifies the binary and locks down the credential", async () => {
+    const res = await request(t.http).get("/api/agent/v1/install.ps1").expect(200);
+    const sum = createHash("sha256").update(fakeExe).digest("hex");
+    expect(res.text).toContain(`amd64 = '${sum}'; arm64 = ''`);
+    expect(res.text).toContain("Checksum mismatch: refusing to install.");
+    expect(res.text).toContain("'*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F'");
+    expect(res.text).toContain("/api/agent/v1/download/windows-$arch");
+    // The script must parse; checked with PowerShell where it's installed (Windows, CI runners).
+    const shell = ["pwsh", "powershell"].find((s) => spawnSync(s, ["-v"]).error === undefined);
+    if (shell) {
+      const dir = mkdtempSync(join(tmpdir(), "nf-ps-"));
+      const file = join(dir, "install.ps1");
+      writeFileSync(file, res.text);
+      const check = spawnSync(shell, [
+        "-NoProfile",
+        "-Command",
+        `$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile('${file}', [ref]$null, [ref]$e); if ($e) { $e | ForEach-Object { $_.ToString() }; exit 1 }`,
+      ]);
+      expect(check.stdout.toString() + check.stderr.toString()).toBe("");
+      expect(check.status).toBe(0);
+    }
   });
 
   it("serves only known builds", async () => {
@@ -519,6 +732,10 @@ describe("installer", () => {
       .expect(200);
     expect(Buffer.compare(bin.body as Buffer, fakeBinary)).toBe(0);
     await request(t.http).get("/api/agent/v1/download/arm64").expect(404);
+    const exe = await request(t.http).get("/api/agent/v1/download/windows-amd64").expect(200);
+    expect(exe.headers["content-disposition"]).toContain("nf-agent-windows-amd64.exe");
+    await request(t.http).get("/api/agent/v1/download/windows-arm64").expect(404);
+    await request(t.http).get("/api/agent/v1/download/windows-..").expect(404);
     await request(t.http).get("/api/agent/v1/download/..%2f..%2fetc%2fpasswd").expect(404);
   });
 });

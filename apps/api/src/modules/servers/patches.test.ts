@@ -105,4 +105,25 @@ describe("patch compliance", () => {
     };
     expect(updateFindings(u)).toEqual([]);
   });
+  it("doesn't repeat a KB number that the Windows update title already names", () => {
+    const u: AgentUpdates = {
+      ...base,
+      manager: "windows-update",
+      runningKernel: "10.0.26100.4652",
+      newestKernel: "",
+      pending: [
+        {
+          name: "2026-11 Cumulative Update for Windows 11 (KB5070001)",
+          arch: "",
+          version: "KB5070001",
+          security: true,
+          severity: "Critical",
+          advisory: "KB5070001",
+        },
+      ],
+    };
+    const [f] = updateFindings(u);
+    expect(f!.detail).toBe("2026-11 Cumulative Update for Windows 11 (KB5070001) (Critical).");
+    expect(f!.remedy).toContain("Windows Update");
+  });
 });

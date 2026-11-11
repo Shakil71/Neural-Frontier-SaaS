@@ -22,13 +22,16 @@ import { DatabaseService } from "../../infra/database.service.js";
 import { AuditService } from "../audit/audit.service.js";
 import { analyseListeners, countOpen, findings, hasPublicAddress } from "./exposure.js";
 import { isUrgent, updateFindings, updatesSummary } from "./patches.js";
+import { windowsFindings } from "./windows.js";
 import type { CreateEnrollmentKeySchema } from "@nf/contracts";
 
 const DAY_MS = 86_400_000;
 const sha = (s: string) => new Uint8Array(createHash("sha256").update(s, "utf8").digest());
 const MAX_LIVE_KEYS = 10;
+const RANK = { high: 0, medium: 1, low: 2 } as const;
 export const AGENT_ARCHES = ["amd64", "arm64"] as const;
 export type AgentArch = (typeof AGENT_ARCHES)[number];
+export type AgentOs = "linux" | "windows";
 
 type ServerRow = Prisma.ServerGetPayload<object>;
 type KeyRow = Prisma.AgentEnrollmentKeyGetPayload<object>;
@@ -101,19 +104,29 @@ export class ServersService {
     let exposure = null;
     if (inv?.listeners && inv.firewall && inv.ssh) {
       const listeners = analyseListeners(inv.listeners, inv.firewall);
-      const list = findings({
+      const list = [
+        ...findings({
+          listeners,
+          firewall: inv.firewall,
+          ssh: inv.ssh,
+          publicHost: hasPublicAddress(inv.interfaces.flatMap((i) => i.addresses)),
+        }),
+        ...(inv.windows ? windowsFindings(inv.windows, inv.collectedAt) : []),
+      ]
+        .sort((a, b) => RANK[a.severity] - RANK[b.severity] || a.key.localeCompare(b.key))
+        .map(mark);
+      exposure = {
         listeners,
         firewall: inv.firewall,
         ssh: inv.ssh,
-        publicHost: hasPublicAddress(inv.interfaces.flatMap((i) => i.addresses)),
-      }).map(mark);
-      exposure = { listeners, firewall: inv.firewall, ssh: inv.ssh, findings: list };
+        windows: inv.windows ?? null,
+        findings: list,
+      };
     }
     const patches = inv?.updates ?? null;
     const patchFindings = patches ? updateFindings(patches).map(mark) : [];
-    const rank = { high: 0, medium: 1, low: 2 } as const;
     const all = [...(exposure?.findings ?? []), ...patchFindings].sort(
-      (a, b) => rank[a.severity] - rank[b.severity] || a.key.localeCompare(b.key),
+      (a, b) => RANK[a.severity] - RANK[b.severity] || a.key.localeCompare(b.key),
     );
     return { exposure, patches, patchFindings, all, reporting: !!exposure || !!patches };
   }
@@ -454,7 +467,12 @@ export class ServersService {
       );
       return created;
     });
-    return { key, enrollmentKey: keyDto(row), installCommand: this.installCommand(key) };
+    return {
+      key,
+      enrollmentKey: keyDto(row),
+      installCommand: this.installCommand(key),
+      windowsInstallCommand: this.windowsInstallCommand(key),
+    };
   }
 
   async revokeKey(actor: Principal, id: string, meta: RequestMeta): Promise<EnrollmentKey> {
@@ -503,9 +521,98 @@ export class ServersService {
     return `curl -fsS${insecure} ${base}/api/agent/v1/install.sh | sudo sh -s -- --key ${key}`;
   }
 
-  binaryPath(arch: AgentArch): string | null {
-    const p = join(this.config.agent.distDir, `nf-agent-linux-${arch}`);
+  binaryPath(arch: AgentArch, os: AgentOs = "linux"): string | null {
+    const file = os === "windows" ? `nf-agent-windows-${arch}.exe` : `nf-agent-linux-${arch}`;
+    const p = join(this.config.agent.distDir, file);
     return existsSync(p) ? p : null;
+  }
+
+  /**
+   * The Windows command: PowerShell as Administrator. With a self-signed certificate, the
+   * download is accepted only from a server presenting exactly the pinned certificate (unlike
+   * curl -k on Linux, nothing else is trusted even for the installer itself).
+   */
+  windowsInstallCommand(key: string): string {
+    const base = this.config.publicUrl.origin;
+    const pin = this.certificatePin();
+    const tls = "[Net.ServicePointManager]::SecurityProtocol = 'Tls12'";
+    const trust = pin
+      ? `; [Net.ServicePointManager]::ServerCertificateValidationCallback = { param($s, $c) [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($c.GetRawCertData())).Replace('-', '') -eq '${pin.slice("sha256:".length).toUpperCase()}' }`
+      : "";
+    return `${tls}${trust}; & ([scriptblock]::Create((New-Object Net.WebClient).DownloadString('${base}/api/agent/v1/install.ps1'))) -Key ${key}`;
+  }
+
+  /**
+   * PowerShell installer for Windows. Verifies the download against SHA-256 sums of the files
+   * this release serves, locks the credential folder to SYSTEM and Administrators, enrols, and
+   * registers the nf-agent service (automatic start, restarted on failure).
+   */
+  windowsInstallScript(): string {
+    const base = this.config.publicUrl.origin;
+    const pin = this.certificatePin();
+    const sums = AGENT_ARCHES.map((a) => {
+      const p = this.binaryPath(a, "windows");
+      return `${a} = '${p ? createHash("sha256").update(readFileSync(p)).digest("hex") : ""}'`;
+    }).join("; ");
+    return `# Neural Frontier Windows agent installer. Read-only inventory; accepts no commands.
+param([Parameter(Mandatory = $true)][string]$Key)
+$ErrorActionPreference = 'Stop'
+$Server = '${base}'
+$Pin = '${pin ?? ""}'
+$Sums = @{ ${sums} }
+try {
+  $me = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+  if (-not $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Run this in PowerShell opened as Administrator.'
+  }
+  switch ($env:PROCESSOR_ARCHITECTURE) {
+    'AMD64' { $arch = 'amd64' }
+    'ARM64' { $arch = 'arm64' }
+    default { throw "Unsupported processor architecture: $env:PROCESSOR_ARCHITECTURE" }
+  }
+  if (-not $Sums[$arch]) { throw "This server has no Windows agent build for $arch." }
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  $dir = Join-Path $env:ProgramFiles 'Neural Frontier'
+  $data = Join-Path $env:ProgramData 'NeuralFrontier'
+  $exe = Join-Path $dir 'nf-agent.exe'
+  $tmp = Join-Path $env:TEMP ('nf-agent-' + [guid]::NewGuid().ToString('N') + '.exe')
+  (New-Object Net.WebClient).DownloadFile("$Server/api/agent/v1/download/windows-$arch", $tmp)
+  $got = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmp).Hash.ToLowerInvariant()
+  if ($got -ne $Sums[$arch]) {
+    Remove-Item -LiteralPath $tmp -Force
+    throw 'Checksum mismatch: refusing to install.'
+  }
+  $svc = Get-Service -Name nf-agent -ErrorAction SilentlyContinue
+  if ($svc -and $svc.Status -ne 'Stopped') {
+    Stop-Service -Name nf-agent -Force
+    $svc.WaitForStatus('Stopped', [TimeSpan]::FromSeconds(30))
+  }
+  New-Item -ItemType Directory -Force -Path $dir, $data | Out-Null
+  # The agent's credential and log: SYSTEM and Administrators only.
+  & icacls.exe $data /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Could not restrict $data." }
+  # Copy (not move) so the program gets the Program Files permissions, not the download's.
+  Copy-Item -LiteralPath $tmp -Destination $exe -Force
+  Remove-Item -LiteralPath $tmp -Force
+  $enroll = @('enroll', '--server', $Server, '--key', $Key)
+  if ($Pin) { $enroll += @('--pin', $Pin) }
+  & $exe @enroll
+  if ($LASTEXITCODE -ne 0) { throw 'Enrollment failed (see the message above).' }
+  $bin = '"' + $exe + '" run'
+  if ($svc) {
+    Set-ItemProperty -LiteralPath 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\nf-agent' -Name ImagePath -Value $bin
+    Set-Service -Name nf-agent -StartupType Automatic
+  } else {
+    New-Service -Name nf-agent -BinaryPathName $bin -DisplayName 'Neural Frontier agent' -StartupType Automatic -Description 'Reports this computer''s inventory, security posture and updates to Neural Frontier. Read-only; accepts no commands.' | Out-Null
+  }
+  & sc.exe failure nf-agent reset= 86400 actions= restart/30000/restart/60000/restart/300000 | Out-Null
+  & sc.exe failureflag nf-agent 1 | Out-Null
+  Start-Service -Name nf-agent
+  Write-Host "Neural Frontier agent installed and reporting. Log: $data\\agent.log"
+} finally {
+  [Net.ServicePointManager]::ServerCertificateValidationCallback = $null
+}
+`;
   }
 
   /**

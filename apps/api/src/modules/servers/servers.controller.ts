@@ -38,6 +38,7 @@ import {
   type AgentArch,
   AgentAuthError,
   type AgentCaller,
+  type AgentOs,
   ServersService,
 } from "./servers.service.js";
 
@@ -128,6 +129,9 @@ export class ServersController {
     return {
       keys: await this.servers.listKeys(p.tenantId),
       agentAvailable: AGENT_ARCHES.some((a) => this.servers.binaryPath(a) !== null),
+      windowsAgentAvailable: AGENT_ARCHES.some(
+        (a) => this.servers.binaryPath(a, "windows") !== null,
+      ),
       certificatePin: this.servers.certificatePin(),
     };
   }
@@ -200,12 +204,22 @@ export class AgentController {
     return this.servers.installScript();
   }
 
-  @Get("download/:arch")
-  download(@Param("arch") arch: string, @Res({ passthrough: true }) res: Response) {
+  @Get("install.ps1")
+  installWindows(@Res({ passthrough: true }) res: Response) {
+    res.type("text/plain").setHeader("Cache-Control", "no-store");
+    return this.servers.windowsInstallScript();
+  }
+
+  /** Linux builds are /download/{amd64,arm64}; Windows builds /download/windows-{amd64,arm64}. */
+  @Get("download/:target")
+  download(@Param("target") target: string, @Res({ passthrough: true }) res: Response) {
+    const os: AgentOs = target.startsWith("windows-") ? "windows" : "linux";
+    const arch = os === "windows" ? target.slice("windows-".length) : target;
     if (!(AGENT_ARCHES as readonly string[]).includes(arch)) throw Errors.notFound("Agent build");
-    const path = this.servers.binaryPath(arch as AgentArch);
+    const path = this.servers.binaryPath(arch as AgentArch, os);
     if (!path) throw Errors.notFound("Agent build");
-    res.setHeader("Content-Disposition", `attachment; filename="nf-agent-linux-${arch}"`);
+    const file = os === "windows" ? `nf-agent-windows-${arch}.exe` : `nf-agent-linux-${arch}`;
+    res.setHeader("Content-Disposition", `attachment; filename="${file}"`);
     res.setHeader("Cache-Control", "no-store");
     return new StreamableFile(createReadStream(path), { type: "application/octet-stream" });
   }

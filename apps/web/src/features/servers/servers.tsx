@@ -64,8 +64,11 @@ const keys = { servers: ["servers"] as const, enrollment: ["agent-enrollment-key
 const KeysSchema = z.object({
   keys: z.array(EnrollmentKeySchema),
   agentAvailable: z.boolean(),
+  windowsAgentAvailable: z.boolean(),
   certificatePin: z.string().nullable(),
 });
+
+type Platform = "linux" | "windows";
 
 const errorMessage = (err: unknown) =>
   err instanceof ApiRequestError ? err.message : "Something went wrong";
@@ -153,12 +156,12 @@ function memoryUse(s: ServerSummary) {
 
 /* ── Add server ───────────────────────────────────────────────────────── */
 
-function CopyBlock({ value }: { value: string }) {
+function CopyBlock({ value, prompt = "$" }: { value: string; prompt?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="group relative rounded-lg border border-border-strong bg-[oklch(0.13_0.026_268)] p-3.5 pr-12">
       <code className="block break-all font-mono text-[12px] leading-relaxed text-[oklch(0.9_0.02_268)]">
-        <span className="select-none text-[oklch(0.7_0.15_160)]">$ </span>
+        <span className="select-none text-[oklch(0.7_0.15_160)]">{prompt} </span>
         {value}
       </code>
       <button
@@ -178,15 +181,55 @@ function CopyBlock({ value }: { value: string }) {
   );
 }
 
+function PlatformTabs({ value, onChange }: { value: Platform; onChange: (p: Platform) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Operating system"
+      className="inline-flex rounded-lg border border-border bg-surface-sunken/60 p-0.5"
+    >
+      {(
+        [
+          ["linux", "Linux"],
+          ["windows", "Windows"],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={value === id}
+          onClick={() => onChange(id)}
+          className={cn(
+            "rounded-md px-3.5 py-1.5 text-[12.5px] font-medium transition-colors",
+            value === id
+              ? "bg-primary-soft text-primary shadow-sm ring-1 ring-primary/30"
+              : "text-muted hover:text-foreground",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const KeyFormSchema = z.object({
   name: z.string().trim().min(2, "At least 2 characters").max(120),
   lifetimeDays: z.coerce.number().int(),
   maxUses: z.string(),
 });
 
-function AddServer({ agentAvailable }: { agentAvailable: boolean }) {
+function AddServer({
+  agentAvailable,
+  windowsAgentAvailable,
+}: {
+  agentAvailable: boolean;
+  windowsAgentAvailable: boolean;
+}) {
   const client = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("linux");
   const [issued, setIssued] = useState<IssuedEnrollmentKey | null>(null);
   const form = useForm<z.input<typeof KeyFormSchema>, unknown, z.output<typeof KeyFormSchema>>({
     resolver: zodResolver(KeyFormSchema),
@@ -217,6 +260,7 @@ function AddServer({ agentAvailable }: { agentAvailable: boolean }) {
         setOpen(o);
         if (!o) {
           setIssued(null);
+          setPlatform("linux");
           form.reset();
         }
       }}
@@ -228,22 +272,42 @@ function AddServer({ agentAvailable }: { agentAvailable: boolean }) {
       </D.Trigger>
       <DialogContent
         className="max-w-2xl"
-        title={issued ? "Run this on the server" : "Add a Linux server"}
+        title={issued ? "Run this on the computer" : "Add a server or computer"}
         description={
           issued
-            ? "As root, on each server you want to add. The key is shown only now."
-            : "Creates an enrollment key. The agent is read-only: it reports inventory and accepts no commands."
+            ? platform === "windows"
+              ? "In PowerShell opened as Administrator, on each Windows computer you want to add. The key is shown only now."
+              : "As root, on each server you want to add. The key is shown only now."
+            : "Creates an enrollment key for Linux and Windows. The agent is read-only: it reports inventory and security posture and accepts no commands."
         }
       >
         {issued ? (
           <div className="space-y-4">
-            <CopyBlock value={issued.installCommand} />
+            <PlatformTabs value={platform} onChange={setPlatform} />
+            {platform === "windows" ? (
+              <CopyBlock value={issued.windowsInstallCommand} prompt="PS>" />
+            ) : (
+              <CopyBlock value={issued.installCommand} />
+            )}
+            {platform === "windows" && !windowsAgentAvailable && (
+              <p className="rounded-lg border border-warning/40 bg-warning-soft px-3.5 py-2.5 text-[12.5px]">
+                This deployment has no Windows agent build yet. The command works after the next
+                deploy.
+              </p>
+            )}
             <ul className="grid gap-2 text-[12.5px] text-muted sm:grid-cols-3">
-              {[
-                ["Verifies", "the download's SHA-256 before installing"],
-                ["Installs", "a hardened systemd service (no capabilities)"],
-                ["Reports", "every 5 minutes; appears here within seconds"],
-              ].map(([a, b]) => (
+              {(platform === "windows"
+                ? [
+                    ["Verifies", "the download's SHA-256 before installing"],
+                    ["Installs", "the nf-agent Windows service; its credential is admin-only"],
+                    ["Reports", "every 5 minutes; appears here within seconds"],
+                  ]
+                : [
+                    ["Verifies", "the download's SHA-256 before installing"],
+                    ["Installs", "a hardened systemd service (no capabilities)"],
+                    ["Reports", "every 5 minutes; appears here within seconds"],
+                  ]
+              ).map(([a, b]) => (
                 <li key={a} className="rounded-lg border border-border bg-surface-sunken/60 p-3">
                   <span className="block font-medium text-foreground">{a}</span>
                   {b}
@@ -251,8 +315,11 @@ function AddServer({ agentAvailable }: { agentAvailable: boolean }) {
               ))}
             </ul>
             <p className="text-[12px] text-subtle">
-              Supports RHEL, Oracle Linux, Rocky, Alma, Fedora, Debian and Ubuntu (x86-64 and
-              ARM64). Key expires {formatDateTime(issued.enrollmentKey.expiresAt)}
+              {platform === "windows"
+                ? "Supports Windows 10 and 11 and Windows Server 2016 or later (x86-64 and ARM64)."
+                : "Supports RHEL, Oracle Linux, Rocky, Alma, Fedora, Debian and Ubuntu (x86-64 and ARM64)."}{" "}
+              The same key works on both. Key expires{" "}
+              {formatDateTime(issued.enrollmentKey.expiresAt)}
               {issued.enrollmentKey.maxUses
                 ? ` or after ${issued.enrollmentKey.maxUses} servers`
                 : ""}
@@ -360,12 +427,19 @@ function ServerCard({ s, index, onOpen }: { s: ServerSummary; index: number; onO
             <dt className="text-subtle">CPU</dt>
             <dd className="font-medium">{s.cpu ? `${s.cpu.cores} cores` : "—"}</dd>
           </div>
-          <div>
-            <dt className="text-subtle">Load</dt>
-            <dd data-numeric className="font-medium">
-              {s.loadAverage ? s.loadAverage[0].toFixed(2) : "—"}
-            </dd>
-          </div>
+          {s.loadAverage ? (
+            <div>
+              <dt className="text-subtle">Load</dt>
+              <dd data-numeric className="font-medium">
+                {s.loadAverage[0].toFixed(2)}
+              </dd>
+            </div>
+          ) : (
+            <div>
+              <dt className="text-subtle">Memory</dt>
+              <dd className="font-medium">{s.memory ? formatBytes(s.memory.totalBytes) : "—"}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-subtle">Uptime</dt>
             <dd className="font-medium">{formatUptime(s.uptimeSeconds)}</dd>
@@ -404,6 +478,7 @@ export function ServerSheet({
     refetchInterval: 30_000,
   });
   const s: ServerDetail | undefined = detail.data;
+  const windows = s?.os?.id === "windows";
   const form = useForm({
     resolver: zodResolver(
       z.object({ reason: z.string().trim().min(3, "Give a reason of at least 3 characters") }),
@@ -447,7 +522,12 @@ export function ServerSheet({
     { id: "disks", label: "Disks", icon: HardDrive, count: s?.disks.length },
     { id: "network", label: "Network", icon: Network, count: s?.interfaces.length },
     { id: "services", label: "Services", icon: Workflow, count: s?.services.length },
-    { id: "packages", label: "Packages", icon: Package, count: s?.packageCount },
+    {
+      id: "packages",
+      label: s?.os?.id === "windows" ? "Programs" : "Packages",
+      icon: Package,
+      count: s?.packageCount,
+    },
   ];
 
   return (
@@ -532,7 +612,7 @@ export function ServerSheet({
                     },
                     {
                       icon: Terminal,
-                      label: "Kernel",
+                      label: windows ? "Build" : "Kernel",
                       value: s.os?.arch ?? "—",
                       sub: s.os?.kernel,
                     },
@@ -558,7 +638,12 @@ export function ServerSheet({
                 <dl className="divide-y divide-border rounded-xl border border-border text-[12.5px]">
                   {[
                     ["Machine ID", s.machineId],
-                    ["Package manager", s.packageManager ?? "—"],
+                    [
+                      "Package source",
+                      s.packageManager === "windows"
+                        ? "Programs and Features"
+                        : (s.packageManager ?? "—"),
+                    ],
                     ["Enrolled", formatDateTime(s.enrolledAt)],
                     ["Last report", formatDateTime(s.lastSeenAt)],
                   ].map(([k, v]) => (
@@ -642,7 +727,11 @@ export function ServerSheet({
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     placeholder={
-                      tab === "services" ? "Filter running services" : "Filter installed packages"
+                      tab === "services"
+                        ? "Filter running services"
+                        : windows
+                          ? "Filter installed programs"
+                          : "Filter installed packages"
                     }
                     aria-label="Filter"
                     className="pl-9"
@@ -798,7 +887,10 @@ export function Servers() {
   const high = data.reduce((n, s) => n + (s.findings?.high ?? 0), 0);
   const highServers = data.filter((s) => (s.findings?.high ?? 0) > 0).length;
   const add = can("servers.manage") ? (
-    <AddServer agentAvailable={meta.data?.agentAvailable ?? true} />
+    <AddServer
+      agentAvailable={meta.data?.agentAvailable ?? true}
+      windowsAgentAvailable={meta.data?.windowsAgentAvailable ?? true}
+    />
   ) : undefined;
 
   return (
@@ -806,7 +898,7 @@ export function Servers() {
       <PageHeader
         eyebrow="Infrastructure"
         title="Servers"
-        description="Linux servers reporting through the Neural Frontier agent: hardware, disks, network, running services and installed packages. Updated every 5 minutes."
+        description="Linux servers and Windows computers reporting through the Neural Frontier agent: hardware, disks, network, services, installed software and security posture. Updated every 5 minutes."
         actions={add}
       />
 

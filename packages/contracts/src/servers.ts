@@ -2,7 +2,7 @@ import { z } from "zod";
 import { IdSchema } from "./common.js";
 
 /**
- * Linux server inventory reported by the Neural Frontier agent (agents/linux).
+ * Server inventory reported by the Neural Frontier agent (agents/nf-agent), on Linux and Windows.
  * Every field is bounded so a misbehaving agent can't store unbounded data.
  */
 const short = (n: number) => z.string().max(n);
@@ -56,7 +56,15 @@ export const AgentPortRangeSchema = z.object({
 });
 export type AgentPortRange = z.infer<typeof AgentPortRangeSchema>;
 
-export const FirewallKindSchema = z.enum(["firewalld", "ufw", "nftables", "iptables", "none"]);
+export const FirewallKindSchema = z.enum([
+  "firewalld",
+  "ufw",
+  "nftables",
+  "iptables",
+  /** Windows Defender Firewall; zones are the connected profiles (domain, private, public). */
+  "windows",
+  "none",
+]);
 
 export const AgentFirewallSchema = z.object({
   kind: FirewallKindSchema,
@@ -99,17 +107,58 @@ export const UpdatesStatusSchema = z.enum(["ok", "unavailable", "unsupported"]);
 export const AgentUpdatesSchema = z.object({
   status: UpdatesStatusSchema,
   error: short(300),
-  manager: z.enum(["rpm", "dpkg", "none"]),
+  manager: z.enum(["rpm", "dpkg", "windows-update", "none"]),
   checkedAt: z.iso.datetime(),
   /** When the package metadata was last refreshed; results are only as fresh as this. */
   metadataAt: z.iso.datetime().nullable(),
   pending: z.array(AgentPendingUpdateSchema).max(5000),
   /** Null when it can't be told (no kernel packages, unknown distribution). */
   rebootRequired: z.boolean().nullable(),
+  /** The running kernel, or the OS build on Windows (10.0.20348.2700). */
   runningKernel: short(128),
   newestKernel: short(128),
 });
 export type AgentUpdates = z.infer<typeof AgentUpdatesSchema>;
+
+/** Security posture of a Windows host (Phase 4c). */
+export const AgentWindowsSchema = z.object({
+  /** Windows Server edition. */
+  server: z.boolean(),
+  /** Antivirus products registered with Windows Security Center (client editions only). */
+  antivirus: z
+    .array(z.object({ name: short(128), enabled: z.boolean(), upToDate: z.boolean() }))
+    .max(16),
+  /** Null when Microsoft Defender Antivirus isn't installed or didn't answer. */
+  defender: z
+    .object({
+      antivirusEnabled: z.boolean(),
+      realTimeProtection: z.boolean(),
+      tamperProtection: z.boolean().nullable(),
+      signaturesUpdatedAt: z.iso.datetime().nullable(),
+    })
+    .nullable(),
+  /** BitLocker on the system drive. */
+  bitlocker: z.enum(["on", "off", "suspended", "encrypting", "unavailable", "unknown"]),
+  systemDrive: short(8),
+  rdp: z.object({ enabled: z.boolean(), nla: z.boolean().nullable(), port }),
+  smb1: z.boolean().nullable(),
+  uac: z.boolean().nullable(),
+  guestEnabled: z.boolean().nullable(),
+  secureBoot: z.boolean().nullable(),
+  /** Members of the local Administrators group. */
+  admins: z.array(short(128)).max(64),
+  firewallProfiles: z
+    .array(
+      z.object({
+        name: z.enum(["domain", "private", "public"]),
+        active: z.boolean(),
+        enabled: z.boolean(),
+        defaultInboundAllow: z.boolean(),
+      }),
+    )
+    .max(3),
+});
+export type AgentWindows = z.infer<typeof AgentWindowsSchema>;
 
 export const AgentInventorySchema = z.object({
   agentVersion: short(64),
@@ -130,13 +179,15 @@ export const AgentInventorySchema = z.object({
     availableBytes: z.number().int().nonnegative(),
   }),
   uptimeSeconds: z.number().int().nonnegative(),
-  loadAverage: z.tuple([z.number(), z.number(), z.number()]),
+  /** Null on Windows, which has no load average. */
+  loadAverage: z.tuple([z.number(), z.number(), z.number()]).nullable(),
   disks: z.array(AgentDiskSchema).max(128),
   interfaces: z.array(AgentInterfaceSchema).max(64),
   services: z.array(AgentServiceSchema).max(2000),
   /** Omitted when unchanged since the last report (see packagesHash). */
   packages: z.array(AgentPackageSchema).max(10_000).optional(),
-  packageManager: z.enum(["rpm", "dpkg", "none"]),
+  /** "windows": installed programs (Programs and Features). */
+  packageManager: z.enum(["rpm", "dpkg", "windows", "none"]),
   packagesHash: short(64),
   packageCount: z.number().int().nonnegative(),
   /** Network exposure; absent from agents released before Phase 4a. */
@@ -145,6 +196,8 @@ export const AgentInventorySchema = z.object({
   ssh: AgentSshSchema.optional(),
   /** Patch state; absent from agents released before Phase 4b. */
   updates: AgentUpdatesSchema.optional(),
+  /** Windows hosts only. */
+  windows: AgentWindowsSchema.optional(),
 });
 export type AgentInventory = z.infer<typeof AgentInventorySchema>;
 
@@ -277,6 +330,8 @@ export const ServerDetailSchema = ServerSummarySchema.extend({
       listeners: z.array(ServerListenerSchema),
       firewall: AgentFirewallSchema,
       ssh: AgentSshSchema,
+      /** Windows hosts only. */
+      windows: AgentWindowsSchema.nullable(),
       findings: z.array(ServerFindingSchema),
     })
     .nullable(),
@@ -304,8 +359,10 @@ export const CreateEnrollmentKeySchema = z.object({
 export const IssuedEnrollmentKeySchema = z.object({
   key: z.string(),
   enrollmentKey: EnrollmentKeySchema,
-  /** A ready-to-paste one-line install command. */
+  /** A ready-to-paste one-line install command (Linux, as root). */
   installCommand: z.string(),
+  /** The same for Windows (PowerShell as Administrator). */
+  windowsInstallCommand: z.string(),
 });
 export type IssuedEnrollmentKey = z.infer<typeof IssuedEnrollmentKeySchema>;
 

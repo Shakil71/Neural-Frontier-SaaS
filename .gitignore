@@ -15,5 +15,5 @@ npm-debug.log*
 .DS_Store
 
 # Linux agent builds
-agents/linux/dist/
+agents/nf-agent/dist/
 agent-dist/

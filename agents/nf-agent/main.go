@@ -1,12 +1,13 @@
-// nf-agent: the Neural Frontier Linux inventory agent.
+// nf-agent: the Neural Frontier inventory agent for Linux and Windows.
 //
 //	nf-agent enroll --server https://host:8643 --key nfe_… [--pin sha256:…]
-//	nf-agent run      # report now, then every interval (systemd service)
+//	nf-agent run      # report now, then every interval (systemd unit or Windows service)
 //	nf-agent once     # print the inventory as JSON and exit (no network)
 //	nf-agent version
 //
-// It only reads system state (/proc, /etc, rpm/dpkg, systemctl). It never changes the host
-// and accepts no commands from the server.
+// It only reads system state (Linux: /proc, /etc, rpm/dpkg, systemctl; Windows: CIM, the
+// registry, Windows Firewall and Windows Update through the built-in PowerShell). It never
+// changes the host and accepts no commands from the server.
 package main
 
 import (
@@ -17,17 +18,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 )
 
 // version is set at build time: -ldflags "-X main.version=…".
 var version = "dev"
-
-const defaultConfigPath = "/etc/nf-agent/agent.json"
 
 func main() {
 	log.SetFlags(0)
@@ -111,7 +108,7 @@ func cmdEnroll(args []string) int {
 	}
 	inv := Collect(context.Background())
 	if !validMachineID(inv.MachineID) {
-		log.Print("enroll: /etc/machine-id is missing or invalid (run systemd-machine-id-setup)")
+		log.Printf("enroll: %s", machineIDHint)
 		return 1
 	}
 	var res struct {
@@ -119,7 +116,7 @@ func cmdEnroll(args []string) int {
 		AgentToken      string `json:"agentToken"`
 		IntervalSeconds int    `json:"intervalSeconds"`
 	}
-	err := postJSON(newHTTPClient(*pin), base+"/api/agent/v1/enroll", "", map[string]string{
+	err := postJSON(context.Background(), newHTTPClient(*pin), base+"/api/agent/v1/enroll", "", map[string]string{
 		"enrollmentKey": *key, "machineId": inv.MachineID, "hostname": inv.Hostname,
 	}, &res)
 	if err != nil {
@@ -139,15 +136,20 @@ func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	cfgPath := fs.String("config", defaultConfigPath, "agent credential file")
 	_ = fs.Parse(args)
-	cfg, err := loadConfig(*cfgPath)
-	if err != nil {
-		log.Printf("run: %v", err)
-		return 1
-	}
-	client := newHTTPClient(cfg.Pin)
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
+	// serve runs the loop under the platform's service manager (systemd, or the Windows service
+	// control manager) and cancels ctx when asked to stop.
+	return serve(func(ctx context.Context) int {
+		cfg, err := loadConfig(*cfgPath)
+		if err != nil {
+			log.Printf("run: %v", err)
+			return 1
+		}
+		return reportLoop(ctx, cfg)
+	})
+}
 
+func reportLoop(ctx context.Context, cfg Config) int {
+	client := newHTTPClient(cfg.Pin)
 	lastHash := ""
 	backoff := time.Duration(0)
 	for {
@@ -155,9 +157,12 @@ func cmdRun(args []string) int {
 		if inv.PackagesHash == lastHash {
 			inv.Packages = nil // unchanged: the server keeps the previous list
 		}
-		err := postJSON(client, cfg.Server+"/api/agent/v1/inventory", cfg.Token, inv, nil)
+		err := postJSON(ctx, client, cfg.Server+"/api/agent/v1/inventory", cfg.Token, inv, nil)
 		var apiErr *apiError
 		switch {
+		case ctx.Err() != nil:
+			log.Print("stopping")
+			return 0
 		case err == nil:
 			lastHash = inv.PackagesHash
 			backoff = 0

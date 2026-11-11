@@ -235,6 +235,26 @@ RHEL-family systems) and whether a reboot is needed: **Infrastructure → Update
   cache-only mode. Re-running the install command on each server installs the new binary and the
   updated unit.
 
+## Windows computers and servers (Phase 4c)
+
+The same agent runs on Windows 10/11 and Windows Server 2016 or later. `deploy.sh` builds
+`nf-agent-windows-{amd64,arm64}.exe` with the Linux builds (Go is already required).
+
+- **Adding one.** Servers → Add server → create a key → **Windows** tab. Run the command in
+  PowerShell opened as Administrator. It downloads `install.ps1`, verifies the agent's SHA-256,
+  installs it to `C:\Program Files\Neural Frontier`, stores the credential in
+  `%ProgramData%\NeuralFrontier` (SYSTEM and Administrators only), enrols, and starts the
+  `nf-agent` service (automatic, restarts on failure).
+- **Reaching the server.** The computer must reach the public URL (port 8643 today). TLS 1.2 is
+  required, which nginx allows. With the self-signed certificate, the command trusts only that
+  exact certificate.
+- **Logs and status.** `Get-Service nf-agent`, and `%ProgramData%\NeuralFrontier\agent.log`
+  (rolled over at 1 MB).
+- **Upgrading.** Run a new command; it stops the service, replaces the program and re-enrols.
+- **Removing.** `Stop-Service nf-agent; sc.exe delete nf-agent`, then delete
+  `C:\Program Files\Neural Frontier` and `%ProgramData%\NeuralFrontier`, and retire the computer
+  in the Admin Center.
+
 ## Backups
 
 ```bash

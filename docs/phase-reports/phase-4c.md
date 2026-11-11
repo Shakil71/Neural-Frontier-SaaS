@@ -189,10 +189,9 @@ Linux agents already deployed keep working unchanged. No migration.
 
 ## Not claimed
 
-- **Not tested yet:** the service start/stop on a real Service Control Manager, and an elevated
-  (LocalSystem) collection. Both are covered by the new CI job, which hadn't run when this report
-  was written. The installer has been parsed but not run end to end against a live server. That
-  needs a deployment that serves the Windows build.
+- **The installer hasn't run end to end against a live server.** It is parsed in tests, and the
+  service start/stop and an elevated (administrator) collection passed in the Windows CI job
+  (run 43031974352). A full install needs a deployment that serves the Windows build.
 - **Firewall analysis evaluates allow rules only.** A block rule, which Windows applies before
   allow rules, may close a port shown as allowed. Group Policy firewall rules are included only
   as far as they appear in the merged policy. Network firewalls are outside the analysis, as on

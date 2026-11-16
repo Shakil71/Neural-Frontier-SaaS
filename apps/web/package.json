@@ -13,7 +13,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@hookform/resolvers": "7.0.5",
+    "@hookform/resolvers": "7.0.6",
     "@nf/contracts": "0.1.0",
     "@tanstack/react-query": "5.107.1",
     "@tanstack/react-table": "9.3.1",
